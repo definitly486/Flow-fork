@@ -4,9 +4,14 @@ name: Build armeabi-v7a APK
 # (Github flavor) or flow-foss-armeabi-v7a.apk (Foss flavor), the same names
 # the main release workflow uses.
 # Signed when the RELEASE_KEYSTORE_BASE64 secret exists, otherwise unsigned.
+#
+# Publishing to GitHub Releases happens only for a signed build, either when a
+# tag named release-* is pushed (the tag name becomes the release name) or when
+# the workflow is started manually with "publish" ticked and a tag filled in.
 on:
   push:
     branches: [ main ]
+    tags: [ 'release-*' ]
   workflow_dispatch:
     inputs:
       flavor:
@@ -16,6 +21,14 @@ on:
         options:
           - Foss
           - Github
+      publish:
+        description: 'Publish to GitHub Releases (needs signing secrets)'
+        type: boolean
+        default: false
+      tag:
+        description: 'Release tag to publish to, e.g. release-1.0 (created if missing)'
+        type: string
+        default: ''
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -32,6 +45,8 @@ jobs:
     name: Build armeabi-v7a
     runs-on: ubuntu-24.04
     timeout-minutes: 60
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout code
@@ -95,3 +110,35 @@ jobs:
           path: dist/${{ steps.rename.outputs.name }}
           if-no-files-found: error
           retention-days: 30
+
+      - name: Publish GitHub Release
+        if: ${{ startsWith(github.ref, 'refs/tags/release-') || (github.event_name == 'workflow_dispatch' && inputs.publish) }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SIGNED: ${{ steps.keystore.outputs.signed }}
+          APK_NAME: ${{ steps.rename.outputs.name }}
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          if [ "$SIGNED" != "true" ]; then
+            echo "::error::Refusing to publish an unsigned APK. Set RELEASE_KEYSTORE_BASE64, STORE_PASSWORD, KEY_ALIAS and KEY_PASSWORD."
+            exit 1
+          fi
+          if [ "${GITHUB_REF#refs/tags/}" != "$GITHUB_REF" ]; then
+            tag="${GITHUB_REF#refs/tags/}"
+          else
+            tag="$INPUT_TAG"
+          fi
+          if [ -z "$tag" ]; then
+            echo "::error::Fill in the 'tag' input to publish a release."
+            exit 1
+          fi
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" "dist/$APK_NAME" --clobber
+          else
+            gh release create "$tag" "dist/$APK_NAME" \
+              --target "$GITHUB_SHA" \
+              --title "$tag" \
+              --generate-notes
+          fi
+          echo "Published $APK_NAME to release $tag."

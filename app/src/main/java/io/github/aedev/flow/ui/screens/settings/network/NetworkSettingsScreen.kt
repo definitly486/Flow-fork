@@ -165,7 +165,7 @@ internal fun NetworkSettingsScreen(
                         }
                     }
                 }
-                field(NetworkIndex.sshKnownHosts, ssh.knownHosts, { value -> sshViewModel.edit { it.copy(knownHosts = value) } }, Icons.Outlined.VpnLock)
+                field(NetworkIndex.sshKnownHosts, ssh.knownHosts, { value -> sshViewModel.edit { it.copy(knownHosts = value) } }, Icons.Outlined.VpnLock) { singleLine = false }
                 row("network.ssh.save") { shape ->
                     Surface(shape = shape, color = MaterialTheme.colorScheme.surfaceContainerHigh) {
                         TextButton(
@@ -203,6 +203,7 @@ private class FieldOptions {
     var error: String? = null
     var keyboardType: KeyboardType = KeyboardType.Text
     var hidden: Boolean = false
+    var singleLine: Boolean = true
     var trailing: (@Composable () -> Unit)? = null
 }
 
@@ -236,7 +237,8 @@ private fun SettingsTextField(
             trailingIcon = options.trailing,
             isError = options.error != null,
             supportingText = options.error?.let { { Text(it) } },
-            singleLine = true,
+            singleLine = options.singleLine,
+            maxLines = if (options.singleLine) 1 else 6,
             keyboardOptions = KeyboardOptions(keyboardType = options.keyboardType),
             visualTransformation = if (options.hidden) PasswordVisualTransformation() else VisualTransformation.None,
         )

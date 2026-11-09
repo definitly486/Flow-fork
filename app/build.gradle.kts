@@ -325,6 +325,7 @@ dependencies {
 
     // Networking
     implementation(libs.okhttp)
+    implementation("com.github.mwiede:jsch:0.2.25")
 
     // Ktor (Managed in libs.versions.toml)
     implementation(libs.ktor.client.core)

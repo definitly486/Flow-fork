@@ -131,6 +131,7 @@ class SshTunnelService : Service() {
 
     /** Keep the actual failure visible after the foreground service has stopped. */
     private fun showFailureNotification(message: String) {
+        if (!stopped.compareAndSet(false, true)) return
         cleanupTunnel()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             stopForeground(STOP_FOREGROUND_DETACH)

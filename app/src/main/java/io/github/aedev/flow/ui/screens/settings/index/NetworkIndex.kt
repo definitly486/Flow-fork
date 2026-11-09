@@ -33,6 +33,11 @@ internal object NetworkIndex {
     val port = entry("port", R.string.proxy_settings_port, R.string.settings_section_proxy_server)
     val username = entry("username", R.string.proxy_settings_username, R.string.settings_section_proxy_sign_in)
     val password = entry("password", R.string.proxy_settings_password, R.string.settings_section_proxy_sign_in)
+    val sshHost = entry("ssh_host", R.string.ssh_tunnel_host, R.string.ssh_tunnel_title)
+    val sshPort = entry("ssh_port", R.string.ssh_tunnel_port, R.string.ssh_tunnel_title)
+    val sshUsername = entry("ssh_username", R.string.ssh_tunnel_username, R.string.ssh_tunnel_title)
+    val sshPassword = entry("ssh_password", R.string.ssh_tunnel_password, R.string.ssh_tunnel_title)
+    val sshKnownHosts = entry("ssh_known_hosts", R.string.ssh_tunnel_known_hosts, R.string.ssh_tunnel_title)
 
-    val all = listOf(enabled, type, bypassOnVpn, host, port, username, password)
+    val all = listOf(enabled, type, bypassOnVpn, host, port, username, password, sshHost, sshPort, sshUsername, sshPassword, sshKnownHosts)
 }

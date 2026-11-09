@@ -50,7 +50,9 @@ class SshTunnelService : Service() {
                 updateNotification(getString(R.string.ssh_tunnel_connected))
             } catch (error: Exception) {
                 Log.e(TAG, "SSH tunnel connection failed", error)
-                showFailureNotification(getString(R.string.ssh_tunnel_failed, error.message ?: error.javaClass.simpleName))
+                if (!stopped.get()) {
+                    showFailureNotification(getString(R.string.ssh_tunnel_failed, error.message ?: error.javaClass.simpleName))
+                }
             }
         }
         return START_NOT_STICKY

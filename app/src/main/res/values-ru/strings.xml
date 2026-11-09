@@ -4513,4 +4513,22 @@
     <string name="liked_videos_empty_title">Пока нет понравившихся видео</string>
     <string name="liked_videos_empty_body">Здесь отображаются видео, которые вам понравились</string>
     <string name="remove_selected_likes_text">Их не будут любить.</string>
+    <string name="ssh_tunnel_title">SSH-туннель</string>
+    <string name="ssh_tunnel_description">Подключение к SSH-серверу и передача через него уже настроенного SOCKS5. Сначала настройте SOCKS5 выше.</string>
+    <string name="ssh_tunnel_host">SSH-сервер</string>
+    <string name="ssh_tunnel_port">Порт SSH</string>
+    <string name="ssh_tunnel_username">Логин SSH</string>
+    <string name="ssh_tunnel_password">Пароль SSH</string>
+    <string name="ssh_tunnel_known_hosts">Known Hosts</string>
+    <string name="ssh_tunnel_known_hosts_hint">Вставьте запись сервера из ssh-keyscan (формат known_hosts)</string>
+    <string name="ssh_tunnel_save">Сохранить настройки SSH</string>
+    <string name="ssh_tunnel_start">Запустить туннель</string>
+    <string name="ssh_tunnel_stop">Остановить</string>
+    <string name="ssh_tunnel_notification_title">SSH-туннель Flow</string>
+    <string name="ssh_tunnel_connecting">Подключение…</string>
+    <string name="ssh_tunnel_connected">Подключено · SOCKS5 работает через SSH</string>
+    <string name="ssh_tunnel_failed">Ошибка подключения: %1$s</string>
+    <string name="ssh_tunnel_invalid_settings">Заполните все поля SSH и добавьте запись Known Hosts.</string>
+    <string name="ssh_tunnel_requires_socks5">Перед запуском включите и настройте SOCKS5 в разделе «Сеть».</string>
+    <string name="ssh_tunnel_saved">Настройки SSH сохранены</string>
 </resources>

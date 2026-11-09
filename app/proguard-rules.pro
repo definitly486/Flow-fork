@@ -92,3 +92,6 @@
 -dontwarn javax.annotation.**
 -dontwarn org.slf4j.**
 -dontwarn java.beans.**
+## JSch uses reflective algorithm and key-type lookups.
+-keep class com.jcraft.jsch.** { *; }
+-dontwarn com.jcraft.jsch.**

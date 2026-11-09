@@ -145,8 +145,8 @@ internal fun NetworkSettingsScreen(
 
         val ssh = sshDraft
         if (ssh != null) {
+            notice("network.ssh.about", text = { stringResource(R.string.ssh_tunnel_description) }, icon = Icons.Outlined.Info)
             group(key = "network.ssh", header = R.string.ssh_tunnel_title) {
-                notice("network.ssh.about", text = { stringResource(R.string.ssh_tunnel_description) }, icon = Icons.Outlined.Info)
                 field(NetworkIndex.sshHost, ssh.host, { value -> sshViewModel.edit { it.copy(host = value) } }, Icons.Outlined.Public)
                 field(NetworkIndex.sshPort, ssh.port.toString(), { value -> sshViewModel.edit { it.copy(port = value.filter(Char::isDigit).toIntOrNull() ?: 0) } }, Icons.Outlined.Tag) {
                     keyboardType = KeyboardType.Number
@@ -165,18 +165,33 @@ internal fun NetworkSettingsScreen(
                     }
                 }
                 field(NetworkIndex.sshKnownHosts, ssh.knownHosts, { value -> sshViewModel.edit { it.copy(knownHosts = value) } }, Icons.Outlined.VpnLock)
-                TextButton(
-                    enabled = ssh.valid,
-                    onClick = {
-                        if (sshViewModel.save()) scope.launch { snackbarHostState.showSnackbar(sshSavedMessage) }
-                    },
-                ) { Text(stringResource(R.string.ssh_tunnel_save)) }
-                TextButton(
-                    enabled = ssh.valid,
-                    onClick = { sshViewModel.start() },
-                ) { Text(stringResource(R.string.ssh_tunnel_start)) }
-                TextButton(onClick = { sshViewModel.stop() }) {
-                    Text(stringResource(R.string.ssh_tunnel_stop))
+                row("network.ssh.save") { shape ->
+                    Surface(shape = shape, color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+                        TextButton(
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = ssh.valid,
+                            onClick = {
+                                if (sshViewModel.save()) scope.launch { snackbarHostState.showSnackbar(sshSavedMessage) }
+                            },
+                        ) { Text(stringResource(R.string.ssh_tunnel_save)) }
+                    }
+                }
+                row("network.ssh.start") { shape ->
+                    Surface(shape = shape, color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+                        TextButton(
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = ssh.valid,
+                            onClick = { sshViewModel.start() },
+                        ) { Text(stringResource(R.string.ssh_tunnel_start)) }
+                    }
+                }
+                row("network.ssh.stop") { shape ->
+                    Surface(shape = shape, color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+                        TextButton(
+                            modifier = Modifier.fillMaxWidth(),
+                            onClick = { sshViewModel.stop() },
+                        ) { Text(stringResource(R.string.ssh_tunnel_stop)) }
+                    }
                 }
             }
         }

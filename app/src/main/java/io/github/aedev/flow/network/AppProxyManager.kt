@@ -100,7 +100,7 @@ object AppProxyManager {
             synchronized(lock) {
                 val previous = config.signature()
                 baseConfig = newConfig.normalized().effective(vpnActive)
-                config = tunnelOverride ?: baseConfig
+                config = tunnelOverride?.effective(vpnActive) ?: baseConfig
                 installJvmAuthenticatorLocked()
                 config.signature() != previous
             }

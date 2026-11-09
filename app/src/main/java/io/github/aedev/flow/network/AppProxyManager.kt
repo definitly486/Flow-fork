@@ -82,6 +82,12 @@ object AppProxyManager {
     @Volatile
     private var config: AppProxyConfig = AppProxyConfig()
 
+    @Volatile
+    private var baseConfig: AppProxyConfig = AppProxyConfig()
+
+    @Volatile
+    private var tunnelOverride: AppProxyConfig? = null
+
     private val lock = Any()
 
     private val livePools = CopyOnWriteArrayList<ConnectionPool>()
@@ -93,12 +99,29 @@ object AppProxyManager {
         val changed =
             synchronized(lock) {
                 val previous = config.signature()
-                config = newConfig.normalized().effective(vpnActive)
+                baseConfig = newConfig.normalized().effective(vpnActive)
+                config = tunnelOverride ?: baseConfig
                 installJvmAuthenticatorLocked()
                 config.signature() != previous
             }
         // A live client's pool is keyed by its selector, not the proxy the selector picks, so a
         // kept-alive connection would otherwise carry on through the previous route.
+        if (changed) livePools.forEach { it.evictAll() }
+    }
+
+    /**
+     * Temporarily routes app traffic through the SSH local forward without changing the saved
+     * proxy preferences. Clearing the override restores the latest regular/VPN-aware proxy.
+     */
+    fun setTunnelProxy(override: AppProxyConfig?) {
+        val changed =
+            synchronized(lock) {
+                val previous = config.signature()
+                tunnelOverride = override?.normalized()
+                config = tunnelOverride ?: baseConfig
+                installJvmAuthenticatorLocked()
+                config.signature() != previous
+            }
         if (changed) livePools.forEach { it.evictAll() }
     }
 

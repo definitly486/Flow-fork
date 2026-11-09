@@ -58,14 +58,19 @@ internal fun NetworkSettingsScreen(
     onBack: (() -> Unit)?,
     highlight: String?,
     viewModel: NetworkSettingsViewModel = hiltViewModel(),
+    sshViewModel: SshTunnelSettingsViewModel = hiltViewModel(),
 ) {
     val draft by viewModel.draft.collectAsStateWithLifecycle()
+    val sshDraft by sshViewModel.draft.collectAsStateWithLifecycle()
     val saved by viewModel.saved.collectAsStateWithLifecycle()
     val pausedByVpn by viewModel.pausedByVpn.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val savedMessage = stringResource(R.string.proxy_settings_saved)
     var passwordVisible by rememberSaveable { mutableStateOf(false) }
+    var sshPasswordVisible by rememberSaveable { mutableStateOf(false) }
+    val sshSavedMessage = stringResource(R.string.ssh_tunnel_saved)
+    val sshPasswordToggle = stringResource(if (sshPasswordVisible) R.string.settings_hide_password else R.string.settings_show_password)
     val types =
         listOf(
             FlowToggleOption(AppProxyType.HTTP, stringResource(R.string.proxy_type_http)),
@@ -137,6 +142,44 @@ internal fun NetworkSettingsScreen(
             }
         }
         notice("network.restart", text = { stringResource(R.string.proxy_settings_restart_notice) })
+
+        val ssh = sshDraft
+        if (ssh != null) {
+            group(key = "network.ssh", header = R.string.ssh_tunnel_title) {
+                notice("network.ssh.about", text = { stringResource(R.string.ssh_tunnel_description) }, icon = Icons.Outlined.Info)
+                field(NetworkIndex.sshHost, ssh.host, { value -> sshViewModel.edit { it.copy(host = value) } }, Icons.Outlined.Public)
+                field(NetworkIndex.sshPort, ssh.port.toString(), { value -> sshViewModel.edit { it.copy(port = value.filter(Char::isDigit).toIntOrNull() ?: 0) } }, Icons.Outlined.Tag) {
+                    keyboardType = KeyboardType.Number
+                }
+                field(NetworkIndex.sshUsername, ssh.username, { value -> sshViewModel.edit { it.copy(username = value) } }, Icons.Outlined.Person)
+                field(NetworkIndex.sshPassword, ssh.password, { value -> sshViewModel.edit { it.copy(password = value) } }, Icons.Outlined.Lock) {
+                    keyboardType = KeyboardType.Password
+                    hidden = !sshPasswordVisible
+                    trailing = {
+                        IconButton(onClick = { sshPasswordVisible = !sshPasswordVisible }) {
+                            Icon(
+                                if (sshPasswordVisible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                                contentDescription = sshPasswordToggle,
+                            )
+                        }
+                    }
+                }
+                field(NetworkIndex.sshKnownHosts, ssh.knownHosts, { value -> sshViewModel.edit { it.copy(knownHosts = value) } }, Icons.Outlined.VpnLock)
+                TextButton(
+                    enabled = ssh.valid,
+                    onClick = {
+                        if (sshViewModel.save()) scope.launch { snackbarHostState.showSnackbar(sshSavedMessage) }
+                    },
+                ) { Text(stringResource(R.string.ssh_tunnel_save)) }
+                TextButton(
+                    enabled = ssh.valid,
+                    onClick = { sshViewModel.start() },
+                ) { Text(stringResource(R.string.ssh_tunnel_start)) }
+                TextButton(onClick = { sshViewModel.stop() }) {
+                    Text(stringResource(R.string.ssh_tunnel_stop))
+                }
+            }
+        }
     }
 }
 

@@ -4390,4 +4390,22 @@
     <string name="keyboard_shortcut_exit_fullscreen">Exit fullscreen</string>
     <string name="keyboard_shortcut_faster">Faster</string>
     <string name="keyboard_shortcut_slower">Slower</string>
+    <string name="ssh_tunnel_title">SSH tunnel</string>
+    <string name="ssh_tunnel_description">Connect to your SSH server and route the existing SOCKS5 proxy through it. Configure the SOCKS5 server above.</string>
+    <string name="ssh_tunnel_host">SSH server</string>
+    <string name="ssh_tunnel_port">SSH port</string>
+    <string name="ssh_tunnel_username">SSH username</string>
+    <string name="ssh_tunnel_password">SSH password</string>
+    <string name="ssh_tunnel_known_hosts">Known Hosts</string>
+    <string name="ssh_tunnel_known_hosts_hint">Paste the server entry from ssh-keyscan (known_hosts format)</string>
+    <string name="ssh_tunnel_save">Save SSH settings</string>
+    <string name="ssh_tunnel_start">Start tunnel</string>
+    <string name="ssh_tunnel_stop">Stop</string>
+    <string name="ssh_tunnel_notification_title">Flow SSH tunnel</string>
+    <string name="ssh_tunnel_connecting">Connecting…</string>
+    <string name="ssh_tunnel_connected">Connected · SOCKS5 is routed through SSH</string>
+    <string name="ssh_tunnel_failed">Connection failed: %1$s</string>
+    <string name="ssh_tunnel_invalid_settings">Complete all SSH fields and add a Known Hosts entry.</string>
+    <string name="ssh_tunnel_requires_socks5">Enable and configure SOCKS5 in Network settings before starting the tunnel.</string>
+    <string name="ssh_tunnel_saved">SSH settings saved</string>
 </resources>

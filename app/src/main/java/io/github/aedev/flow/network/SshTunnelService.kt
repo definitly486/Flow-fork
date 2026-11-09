@@ -70,11 +70,13 @@ class SshTunnelService : Service() {
             setPassword(ssh.password)
             setConfig("StrictHostKeyChecking", "yes")
             setConfig("PreferredAuthentications", "password,keyboard-interactive")
-            connect(20_000)
         }
+        session = connected
         try {
+            connected.connect(20_000)
+            check(!stopped.get()) { "SSH tunnel start was cancelled" }
             connected.setPortForwardingL(LOCAL_HOST, LOCAL_PORT, proxy.host.trim(), proxy.port)
-            session = connected
+            check(!stopped.get()) { "SSH tunnel start was cancelled" }
             AppProxyManager.setTunnelProxy(
                 proxy.copy(host = LOCAL_HOST, port = LOCAL_PORT, type = AppProxyType.SOCKS5, enabled = true),
             )

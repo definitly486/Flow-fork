@@ -28,6 +28,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 class SshTunnelService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val stopped = AtomicBoolean(false)
+    private val connecting = AtomicBoolean(false)
     @Volatile private var session: com.jcraft.jsch.Session? = null
 
     override fun onCreate() {
@@ -42,6 +43,7 @@ class SshTunnelService : Service() {
         }
 
         startAsForeground()
+        if (!connecting.compareAndSet(false, true)) return START_NOT_STICKY
         scope.launch {
             try {
                 establishTunnel()

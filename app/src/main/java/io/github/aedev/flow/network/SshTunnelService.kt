@@ -50,8 +50,7 @@ class SshTunnelService : Service() {
                 updateNotification(getString(R.string.ssh_tunnel_connected))
             } catch (error: Exception) {
                 Log.e(TAG, "SSH tunnel connection failed", error)
-                updateNotification(getString(R.string.ssh_tunnel_failed, error.message ?: error.javaClass.simpleName))
-                stopTunnel()
+                showFailureNotification(getString(R.string.ssh_tunnel_failed, error.message ?: error.javaClass.simpleName))
             }
         }
         return START_NOT_STICKY
@@ -104,7 +103,7 @@ class SshTunnelService : Service() {
         }
     }
 
-    private fun buildNotification(message: String): Notification {
+    private fun buildNotification(message: String, ongoing: Boolean = true, showStop: Boolean = true): Notification {
         val stopIntent = Intent(this, SshTunnelService::class.java).setAction(ACTION_STOP)
         val stopPendingIntent =
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -116,14 +115,30 @@ class SshTunnelService : Service() {
             .setSmallIcon(android.R.drawable.stat_sys_upload)
             .setContentTitle(getString(R.string.ssh_tunnel_notification_title))
             .setContentText(message)
-            .setOngoing(true)
+            .setOngoing(ongoing)
             .setOnlyAlertOnce(true)
-            .addAction(0, getString(R.string.ssh_tunnel_stop), stopPendingIntent)
+            .apply {
+                if (showStop) addAction(0, getString(R.string.ssh_tunnel_stop), stopPendingIntent)
+            }
             .build()
     }
 
     private fun updateNotification(message: String) {
         getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, buildNotification(message))
+    }
+
+    /** Keep the actual failure visible after the foreground service has stopped. */
+    private fun showFailureNotification(message: String) {
+        cleanupTunnel()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            stopForeground(STOP_FOREGROUND_DETACH)
+        } else {
+            @Suppress("DEPRECATION")
+            stopForeground(false)
+        }
+        getSystemService(NotificationManager::class.java)
+            .notify(NOTIFICATION_ID, buildNotification(message, ongoing = false, showStop = false))
+        stopSelf()
     }
 
     private fun createChannel() {
@@ -134,13 +149,17 @@ class SshTunnelService : Service() {
         }
     }
 
-    private fun stopTunnel() {
-        if (!stopped.compareAndSet(false, true)) return
+    private fun cleanupTunnel() {
         session?.let { runCatching { it.delPortForwardingL(LOCAL_PORT) }; it.disconnect() }
         session = null
         AppProxyManager.setTunnelProxy(null)
         io.github.aedev.flow.innertube.YouTube.proxy = AppProxyManager.currentProxy()
         io.github.aedev.flow.innertube.YouTube.proxyAuth = AppProxyManager.currentHttpProxyAuthorizationHeader()
+    }
+
+    private fun stopTunnel() {
+        if (!stopped.compareAndSet(false, true)) return
+        cleanupTunnel()
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }

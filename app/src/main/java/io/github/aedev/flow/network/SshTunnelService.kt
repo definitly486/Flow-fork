@@ -9,9 +9,12 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.util.Base64
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import com.jcraft.jsch.HostKey
 import com.jcraft.jsch.JSch
+import com.jcraft.jsch.Session
 import io.github.aedev.flow.R
 import io.github.aedev.flow.data.local.PlayerPreferences
 import io.github.aedev.flow.data.local.SshTunnelConfigStore
@@ -19,17 +22,29 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import java.io.ByteArrayInputStream
-import java.util.concurrent.atomic.AtomicBoolean
+import java.io.File
+import java.security.MessageDigest
+import java.security.NoSuchAlgorithmException
+import java.security.Provider
+import java.security.Security
+import java.security.Signature
+import org.bouncycastle.jce.provider.BouncyCastleProvider
 
-/** Keeps an SSH local forward alive and routes Flow's configured SOCKS5 proxy through it. */
+/**
+ * SSH local-forward service, ported from Telegram-X's proven SshTunnelService:
+ * 127.0.0.1:1080 -> SSH -> the SOCKS5 listener on the SSH server.
+ *
+ * Flow's saved SOCKS5 endpoint remains the source of port and credentials; SSH settings
+ * are stored separately and never overwrite the saved proxy.
+ */
 class SshTunnelService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val stopped = AtomicBoolean(false)
-    private val connecting = AtomicBoolean(false)
-    @Volatile private var session: com.jcraft.jsch.Session? = null
+    @Volatile private var running = false
+    @Volatile private var session: Session? = null
+    @Volatile private var tunnelProxy: AppProxyConfig? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -41,107 +56,172 @@ class SshTunnelService : Service() {
             stopTunnel()
             return START_NOT_STICKY
         }
-
         startAsForeground()
-        if (!connecting.compareAndSet(false, true)) return START_NOT_STICKY
-        scope.launch {
-            try {
-                establishTunnel()
-                updateNotification(getString(R.string.ssh_tunnel_connected))
-            } catch (error: Exception) {
-                Log.e(TAG, "SSH tunnel connection failed", error)
-                if (!stopped.get()) {
-                    showFailureNotification(getString(R.string.ssh_tunnel_failed, error.message ?: error.javaClass.simpleName))
-                }
-            }
+        if (!running) {
+            running = true
+            scope.launch { tunnelLoop() }
         }
-        return START_NOT_STICKY
+        return START_STICKY
     }
 
-    private suspend fun establishTunnel() = withContext(Dispatchers.IO) {
-        val ssh = SshTunnelConfigStore.load(this@SshTunnelService)
+    private suspend fun tunnelLoop() {
+        while (running && scope.isActive) {
+            try {
+                establishTunnel()
+                updateNotification("SSH tunnel connected")
+                val active = session
+                while (running && active != null && active.isConnected) delay(1000)
+                if (running) Log.w(TAG, "SSH connection was closed; reconnecting")
+            } catch (error: Exception) {
+                if (running) Log.e(TAG, "SSH tunnel connection failed", error)
+            } finally {
+                disconnect()
+                clearTunnelProxy()
+            }
+            if (running) {
+                updateNotification("SSH disconnected; reconnecting in 5 seconds")
+                delay(RECONNECT_DELAY_MS)
+            }
+        }
+    }
+
+    private fun establishTunnel() {
+        val ssh = SshTunnelConfigStore.load(this)
         require(ssh.valid) { getString(R.string.ssh_tunnel_invalid_settings) }
 
-        val proxy = PlayerPreferences(this@SshTunnelService).getProxyConfig()
+        val proxy = PlayerPreferences(this).getProxyConfig()
         require(proxy.enabled && proxy.type == AppProxyType.SOCKS5 && proxy.hasUsableEndpoint()) {
             getString(R.string.ssh_tunnel_requires_socks5)
         }
 
+        // JSch's known_hosts parser expects a real file. This mirrors Telegram-X and avoids
+        // provider/parser differences seen when passing an in-memory stream.
+        val knownHostsFile = File(filesDir, "ssh_tunnel_known_hosts")
+        knownHostsFile.writeText(ssh.knownHosts.trim() + "\n", Charsets.UTF_8)
+
+        ensureEd25519Support()
         val jsch = JSch()
-        jsch.setKnownHosts(ByteArrayInputStream(ssh.knownHosts.toByteArray(Charsets.UTF_8)))
+        jsch.setKnownHosts(knownHostsFile.absolutePath)
+        val repository = jsch.hostKeyRepository
+        val expected = repository.getHostKey(ssh.host.trim(), null)
+        Log.i(TAG, "Known-host check: host=${ssh.host.trim()}, port=${ssh.port}, fileExists=${knownHostsFile.isFile}, fileLength=${knownHostsFile.length()}, loadedEntries=${expected?.size ?: 0}")
+        expected?.forEach { key ->
+            Log.i(TAG, "Expected host key: host=${key.host}, type=${key.type}, fingerprint=${fingerprint(Base64.decode(key.key, Base64.DEFAULT))}")
+        }
+
         val connected = jsch.getSession(ssh.username, ssh.host.trim(), ssh.port).apply {
             setPassword(ssh.password)
             setConfig("StrictHostKeyChecking", "yes")
-            setConfig("PreferredAuthentications", "password,keyboard-interactive")
+            // Match the pinned key used by Telegram-X instead of letting JSch negotiate
+            // a different host-key algorithm than the one the user pinned.
+            setConfig("server_host_key", "ssh-ed25519")
+            setConfig("PreferredAuthentications", "password")
+            setServerAliveInterval(10_000)
+            setServerAliveCountMax(3)
         }
         session = connected
         try {
-            connected.connect(20_000)
-            check(!stopped.get()) { "SSH tunnel start was cancelled" }
-            connected.setPortForwardingL(LOCAL_HOST, LOCAL_PORT, proxy.host.trim(), proxy.port)
-            check(!stopped.get()) { "SSH tunnel start was cancelled" }
-            AppProxyManager.setTunnelProxy(
-                proxy.copy(host = LOCAL_HOST, port = LOCAL_PORT, type = AppProxyType.SOCKS5, enabled = true),
+            connected.connect(15_000)
+            check(running) { "SSH tunnel start was cancelled" }
+            // SOCKS5 and SSH are on the same remote machine: target its loopback listener.
+            connected.setPortForwardingL(LOCAL_HOST, LOCAL_PORT, "127.0.0.1", proxy.port)
+            check(running) { "SSH tunnel start was cancelled" }
+
+            val localProxy = proxy.copy(
+                host = LOCAL_HOST,
+                port = LOCAL_PORT,
+                type = AppProxyType.SOCKS5,
+                enabled = true,
             )
-            // Keep the non-OkHttp YouTube extractor on the same local SOCKS route.
+            tunnelProxy = localProxy
+            AppProxyManager.setTunnelProxy(localProxy)
             io.github.aedev.flow.innertube.YouTube.proxy = AppProxyManager.currentProxy()
+            // SOCKS5 authentication remains in AppProxyManager's configured credentials.
             io.github.aedev.flow.innertube.YouTube.proxyAuth = null
+            Log.i(TAG, "SSH tunnel established: 127.0.0.1:$LOCAL_PORT -> SSH -> 127.0.0.1:${proxy.port}")
         } catch (error: Exception) {
             connected.disconnect()
+            session = null
             throw error
         }
     }
 
+    private fun ensureEd25519Support() {
+        try {
+            val signature = Signature.getInstance("Ed25519")
+            Log.i(TAG, "Ed25519 signature available from ${signature.provider.name}")
+            return
+        } catch (_: NoSuchAlgorithmException) {
+            // Android builds may not expose the JCA Ed25519 algorithm by default.
+        }
+
+        val current = Security.getProvider(BouncyCastleProvider.PROVIDER_NAME)
+        if (current != null) {
+            try {
+                Signature.getInstance("Ed25519", current)
+                Security.insertProviderAt(current, 1)
+                Log.i(TAG, "Ed25519 signature available from existing ${current.name} provider")
+                return
+            } catch (_: NoSuchAlgorithmException) {
+                Security.removeProvider(BouncyCastleProvider.PROVIDER_NAME)
+            }
+        }
+        Security.insertProviderAt(BouncyCastleProvider(), 1)
+        val signature = Signature.getInstance("Ed25519")
+        Log.i(TAG, "Ed25519 signature available from ${signature.provider.name} provider")
+    }
+
+    private fun fingerprint(key: ByteArray): String =
+        try {
+            val digest = MessageDigest.getInstance("SHA-256").digest(key)
+            "SHA256:" + Base64.encodeToString(digest, Base64.NO_WRAP or Base64.NO_PADDING)
+        } catch (error: Exception) {
+            "unavailable:${error.javaClass.simpleName}"
+        }
+
+    private fun clearTunnelProxy() {
+        tunnelProxy = null
+        AppProxyManager.setTunnelProxy(null)
+        io.github.aedev.flow.innertube.YouTube.proxy = AppProxyManager.currentProxy()
+        io.github.aedev.flow.innertube.YouTube.proxyAuth = AppProxyManager.currentHttpProxyAuthorizationHeader()
+    }
+
+    private fun disconnect() {
+        val active = session
+        session = null
+        if (active != null) runCatching { active.disconnect() }
+    }
+
     private fun startAsForeground() {
-        val notification = buildNotification(getString(R.string.ssh_tunnel_connecting))
+        val notification = buildNotification("Connecting to SSH server")
         if (Build.VERSION.SDK_INT >= 34) {
-            startForeground(
-                NOTIFICATION_ID,
-                notification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE,
-            )
+            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
         } else {
             startForeground(NOTIFICATION_ID, notification)
         }
     }
 
-    private fun buildNotification(message: String, ongoing: Boolean = true, showStop: Boolean = true): Notification {
+    private fun buildNotification(message: String): Notification {
         val stopIntent = Intent(this, SshTunnelService::class.java).setAction(ACTION_STOP)
+        val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         val stopPendingIntent =
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                PendingIntent.getForegroundService(this, 1, stopIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+                PendingIntent.getForegroundService(this, 1, stopIntent, flags)
             } else {
-                PendingIntent.getService(this, 1, stopIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+                PendingIntent.getService(this, 1, stopIntent, flags)
             }
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.stat_sys_upload)
             .setContentTitle(getString(R.string.ssh_tunnel_notification_title))
             .setContentText(message)
-            .setOngoing(ongoing)
+            .setOngoing(true)
             .setOnlyAlertOnce(true)
-            .apply {
-                if (showStop) addAction(0, getString(R.string.ssh_tunnel_stop), stopPendingIntent)
-            }
+            .addAction(0, getString(R.string.ssh_tunnel_stop), stopPendingIntent)
             .build()
     }
 
     private fun updateNotification(message: String) {
         getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, buildNotification(message))
-    }
-
-    /** Keep the actual failure visible after the foreground service has stopped. */
-    private fun showFailureNotification(message: String) {
-        if (!stopped.compareAndSet(false, true)) return
-        cleanupTunnel()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            stopForeground(STOP_FOREGROUND_DETACH)
-        } else {
-            @Suppress("DEPRECATION")
-            stopForeground(false)
-        }
-        getSystemService(NotificationManager::class.java)
-            .notify(NOTIFICATION_ID, buildNotification(message, ongoing = false, showStop = false))
-        stopSelf()
     }
 
     private fun createChannel() {
@@ -152,23 +232,19 @@ class SshTunnelService : Service() {
         }
     }
 
-    private fun cleanupTunnel() {
-        session?.let { runCatching { it.delPortForwardingL(LOCAL_PORT) }; it.disconnect() }
-        session = null
-        AppProxyManager.setTunnelProxy(null)
-        io.github.aedev.flow.innertube.YouTube.proxy = AppProxyManager.currentProxy()
-        io.github.aedev.flow.innertube.YouTube.proxyAuth = AppProxyManager.currentHttpProxyAuthorizationHeader()
-    }
-
     private fun stopTunnel() {
-        if (!stopped.compareAndSet(false, true)) return
-        cleanupTunnel()
+        running = false
+        disconnect()
+        clearTunnelProxy()
+        scope.cancel()
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
 
     override fun onDestroy() {
-        stopTunnel()
+        running = false
+        disconnect()
+        clearTunnelProxy()
         scope.cancel()
         super.onDestroy()
     }
@@ -181,11 +257,14 @@ class SshTunnelService : Service() {
         private const val NOTIFICATION_ID = 7412
         private const val LOCAL_HOST = "127.0.0.1"
         private const val LOCAL_PORT = 1080
+        private const val RECONNECT_DELAY_MS = 5_000L
         private const val ACTION_STOP = "io.github.aedev.flow.action.STOP_SSH_TUNNEL"
 
         fun start(context: android.content.Context) {
-            val intent = Intent(context, SshTunnelService::class.java)
-            androidx.core.content.ContextCompat.startForegroundService(context, intent)
+            androidx.core.content.ContextCompat.startForegroundService(
+                context,
+                Intent(context, SshTunnelService::class.java),
+            )
         }
 
         fun stop(context: android.content.Context) {

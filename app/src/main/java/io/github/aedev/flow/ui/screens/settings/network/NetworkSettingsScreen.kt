@@ -144,6 +144,7 @@ internal fun NetworkSettingsScreen(
         notice("network.restart", text = { stringResource(R.string.proxy_settings_restart_notice) })
 
         val ssh = sshDraft
+        val proxyReadyForTunnel = form.enabled && form.type == AppProxyType.SOCKS5 && form.valid && form == saved
         if (ssh != null) {
             notice("network.ssh.about", text = { stringResource(R.string.ssh_tunnel_description) }, icon = Icons.Outlined.Info)
             group(key = "network.ssh", header = R.string.ssh_tunnel_title) {
@@ -180,7 +181,7 @@ internal fun NetworkSettingsScreen(
                     Surface(shape = shape, color = MaterialTheme.colorScheme.surfaceContainerHigh) {
                         TextButton(
                             modifier = Modifier.fillMaxWidth(),
-                            enabled = ssh.valid,
+                            enabled = ssh.valid && proxyReadyForTunnel,
                             onClick = { sshViewModel.start() },
                         ) { Text(stringResource(R.string.ssh_tunnel_start)) }
                     }

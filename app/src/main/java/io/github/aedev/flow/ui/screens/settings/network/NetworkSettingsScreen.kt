@@ -75,6 +75,7 @@ internal fun NetworkSettingsScreen(
     val saved by viewModel.saved.collectAsStateWithLifecycle()
     val pausedByVpn by viewModel.pausedByVpn.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
     var backupDialog by rememberSaveable { mutableStateOf<String?>(null) }
     var backupPassword by rememberSaveable { mutableStateOf("") }
@@ -98,7 +99,6 @@ internal fun NetworkSettingsScreen(
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) { pendingImportUri = uri; backupPassword = ""; backupDialog = "import" }
     }
-    val snackbarHostState = remember { SnackbarHostState() }
     val savedMessage = stringResource(R.string.proxy_settings_saved)
     var passwordVisible by rememberSaveable { mutableStateOf(false) }
     var sshPasswordVisible by rememberSaveable { mutableStateOf(false) }

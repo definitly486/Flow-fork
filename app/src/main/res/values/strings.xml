@@ -4408,4 +4408,16 @@
     <string name="ssh_tunnel_invalid_settings">Complete all SSH fields and add a Known Hosts entry.</string>
     <string name="ssh_tunnel_requires_socks5">Enable and configure SOCKS5 in Network settings before starting the tunnel.</string>
     <string name="ssh_tunnel_saved">SSH settings saved</string>
+    <string name="ssh_tunnel_reconnecting">SSH disconnected; reconnecting…</string>
+    <string name="ssh_tunnel_status_stopped">Tunnel stopped</string>
+    <string name="ssh_tunnel_status_stopped_detail">Traffic uses the configured proxy directly.</string>
+    <string name="ssh_tunnel_status_connecting">Connecting</string>
+    <string name="ssh_tunnel_status_connecting_detail">Establishing SSH connection and SOCKS5 forwarding.</string>
+    <string name="ssh_tunnel_status_connected">Tunnel is working</string>
+    <string name="ssh_tunnel_status_connected_detail">SOCKS5 traffic is routed through the SSH server.</string>
+    <string name="ssh_tunnel_status_reconnecting">Reconnecting</string>
+    <string name="ssh_tunnel_status_reconnecting_detail">Connection lost. Automatic retry is in progress.</string>
+    <string name="ssh_tunnel_status_error">Connection error</string>
+    <string name="ssh_tunnel_status_error_detail">%1$s. The app will retry automatically.</string>
+    <string name="ssh_tunnel_start_connected">Tunnel is already running</string>
 </resources>

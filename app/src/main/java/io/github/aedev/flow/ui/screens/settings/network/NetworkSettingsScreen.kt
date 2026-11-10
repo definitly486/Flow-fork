@@ -176,9 +176,11 @@ internal fun NetworkSettingsScreen(
                             androidx.compose.foundation.layout.Column(Modifier.padding(start = 12.dp).weight(1f)) {
                                 Text(stringResource(statusText), color = statusColor, style = MaterialTheme.typography.titleSmall)
                                 Text(
-                                    if (sshStatus.phase == io.github.aedev.flow.network.TunnelPhase.ERROR) {
-                                        stringResource(R.string.ssh_tunnel_status_error_detail, sshStatus.detail ?: stringResource(R.string.unknown_error))
-                                    } else stringResource(statusDetail),
+                                    when {
+                                        sshStatus.phase == io.github.aedev.flow.network.TunnelPhase.ERROR -> stringResource(R.string.ssh_tunnel_status_error_detail, sshStatus.detail ?: stringResource(R.string.unknown_error))
+                                        sshStatus.phase == io.github.aedev.flow.network.TunnelPhase.RECONNECTING && sshStatus.detail != null -> stringResource(R.string.ssh_tunnel_status_reconnecting_error_detail, sshStatus.detail)
+                                        else -> stringResource(statusDetail)
+                                    },
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )

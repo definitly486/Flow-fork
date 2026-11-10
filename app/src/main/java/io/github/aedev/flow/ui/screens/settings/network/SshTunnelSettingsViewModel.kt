@@ -25,6 +25,7 @@ class SshTunnelSettingsViewModel
     ) : ViewModel() {
         private val _draft = MutableStateFlow<SshTunnelConfig?>(SshTunnelConfigStore.load(context))
         val draft: StateFlow<SshTunnelConfig?> = _draft.asStateFlow()
+        val status: StateFlow<io.github.aedev.flow.network.TunnelStatus> = SshTunnelService.status
 
         fun edit(transform: (SshTunnelConfig) -> SshTunnelConfig) = _draft.update { it?.let(transform) }
 

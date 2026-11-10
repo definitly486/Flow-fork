@@ -109,7 +109,7 @@ internal class Socks5AuthBridge(
             upstreamOutput.flush()
             val methodReply = ByteArray(2)
             upstreamInput.readFully(methodReply)
-            if (methodReply[0].toInt() and 0xff != SOCKS_VERSION || methodReply[1].toInt() and 0xff != USER_PASS) {
+            if ((methodReply[0].toInt() and 0xff) != SOCKS_VERSION || (methodReply[1].toInt() and 0xff) != USER_PASS) {
                 sendConnectFailure(clientOutput)
                 throw IOException("Remote SOCKS5 server rejected username/password method")
             }
@@ -122,7 +122,7 @@ internal class Socks5AuthBridge(
 
             val authReply = ByteArray(2)
             upstreamInput.readFully(authReply)
-            if (authReply[0].toInt() and 0xff != 1 || authReply[1].toInt() != 0) {
+            if ((authReply[0].toInt() and 0xff) != 1 || authReply[1].toInt() != 0) {
                 sendConnectFailure(clientOutput)
                 Log.e(TAG, "Remote SOCKS5 username/password authentication rejected (status=${authReply[1].toInt() and 0xff})")
                 throw IOException("Remote SOCKS5 username/password authentication failed")
@@ -160,20 +160,20 @@ internal class Socks5AuthBridge(
         val buffer = ByteArrayOutputStream()
         val header = ByteArray(4)
         input.readFully(header)
-        if (header[0].toInt() and 0xff != SOCKS_VERSION) throw IOException("Invalid SOCKS request version")
-        if (header[1].toInt() and 0xff != CONNECT_COMMAND) throw IOException("Only SOCKS CONNECT is supported")
+        if ((header[0].toInt() and 0xff) != SOCKS_VERSION) throw IOException("Invalid SOCKS request version")
+        if ((header[1].toInt() and 0xff) != CONNECT_COMMAND) throw IOException("Only SOCKS CONNECT is supported")
         buffer.write(header)
-        when (header[3].toInt() and 0xff) {
-            IPV4 -> buffer.write(ByteArray(4).also(input::readFully))
+        when ((header[3].toInt() and 0xff)) {
+            IPV4 -> buffer.write(ByteArray(4).also { input.readFully(it) })
             DOMAIN -> {
                 val length = input.readUnsignedByte()
                 buffer.write(length)
-                buffer.write(ByteArray(length).also(input::readFully))
+                buffer.write(ByteArray(length).also { input.readFully(it) })
             }
-            IPV6 -> buffer.write(ByteArray(16).also(input::readFully))
+            IPV6 -> buffer.write(ByteArray(16).also { input.readFully(it) })
             else -> throw IOException("Unsupported SOCKS address type")
         }
-        buffer.write(ByteArray(2).also(input::readFully))
+        buffer.write(ByteArray(2).also { input.readFully(it) })
         return buffer.toByteArray()
     }
 
@@ -181,19 +181,19 @@ internal class Socks5AuthBridge(
         val buffer = ByteArrayOutputStream()
         val header = ByteArray(4)
         input.readFully(header)
-        if (header[0].toInt() and 0xff != SOCKS_VERSION) throw IOException("Invalid remote SOCKS reply")
+        if ((header[0].toInt() and 0xff) != SOCKS_VERSION) throw IOException("Invalid remote SOCKS reply")
         buffer.write(header)
-        when (header[3].toInt() and 0xff) {
-            IPV4 -> buffer.write(ByteArray(4).also(input::readFully))
+        when ((header[3].toInt() and 0xff)) {
+            IPV4 -> buffer.write(ByteArray(4).also { input.readFully(it) })
             DOMAIN -> {
                 val length = input.readUnsignedByte()
                 buffer.write(length)
-                buffer.write(ByteArray(length).also(input::readFully))
+                buffer.write(ByteArray(length).also { input.readFully(it) })
             }
-            IPV6 -> buffer.write(ByteArray(16).also(input::readFully))
+            IPV6 -> buffer.write(ByteArray(16).also { input.readFully(it) })
             else -> throw IOException("Unsupported remote SOCKS reply address type")
         }
-        buffer.write(ByteArray(2).also(input::readFully))
+        buffer.write(ByteArray(2).also { input.readFully(it) })
         return buffer.toByteArray()
     }
 

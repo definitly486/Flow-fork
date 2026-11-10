@@ -29,6 +29,11 @@ class SshTunnelSettingsViewModel
 
         fun edit(transform: (SshTunnelConfig) -> SshTunnelConfig) = _draft.update { it?.let(transform) }
 
+        fun importConfig(config: SshTunnelConfig) {
+            _draft.value = config
+            viewModelScope.launch(Dispatchers.IO) { SshTunnelConfigStore.save(context, config) }
+        }
+
         fun save(): Boolean {
             val config = _draft.value ?: return false
             if (!config.valid) return false

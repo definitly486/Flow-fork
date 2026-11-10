@@ -60,6 +60,7 @@ class SshTunnelService : Service() {
         }
         startAsForeground()
         if (!running) {
+            _status.value = TunnelStatus(TunnelPhase.CONNECTING)
             running = true
             scope.launch { tunnelLoop() }
         }
@@ -70,18 +71,23 @@ class SshTunnelService : Service() {
         while (running && scope.isActive) {
             try {
                 establishTunnel()
-                updateNotification("SSH tunnel connected")
+                _status.value = TunnelStatus(TunnelPhase.CONNECTED)
+                updateNotification(getString(R.string.ssh_tunnel_connected))
                 val active = session
                 while (running && active != null && active.isConnected) delay(1000)
                 if (running) Log.w(TAG, "SSH connection was closed; reconnecting")
             } catch (error: Exception) {
-                if (running) Log.e(TAG, "SSH tunnel connection failed", error)
+                if (running) {
+                    Log.e(TAG, "SSH tunnel connection failed", error)
+                    _status.value = TunnelStatus(TunnelPhase.ERROR, error.localizedMessage ?: error.javaClass.simpleName)
+                }
             } finally {
                 disconnect()
                 clearTunnelProxy()
             }
             if (running) {
-                updateNotification("SSH disconnected; reconnecting in 5 seconds")
+                _status.value = TunnelStatus(TunnelPhase.RECONNECTING)
+                updateNotification(getString(R.string.ssh_tunnel_reconnecting))
                 delay(RECONNECT_DELAY_MS)
             }
         }
@@ -253,6 +259,7 @@ class SshTunnelService : Service() {
 
     private fun stopTunnel() {
         running = false
+        _status.value = TunnelStatus(TunnelPhase.STOPPED)
         disconnect()
         clearTunnelProxy()
         scope.cancel()
@@ -262,6 +269,7 @@ class SshTunnelService : Service() {
 
     override fun onDestroy() {
         running = false
+        _status.value = TunnelStatus(TunnelPhase.STOPPED)
         disconnect()
         clearTunnelProxy()
         scope.cancel()
@@ -271,6 +279,9 @@ class SshTunnelService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     companion object {
+        private val _status = kotlinx.coroutines.flow.MutableStateFlow(TunnelStatus(TunnelPhase.STOPPED))
+        val status: kotlinx.coroutines.flow.StateFlow<TunnelStatus> = _status
+
         private const val TAG = "SshTunnelService"
         private const val CHANNEL_ID = "ssh_tunnel"
         private const val NOTIFICATION_ID = 7412
@@ -281,6 +292,7 @@ class SshTunnelService : Service() {
         private const val ACTION_STOP = "io.github.aedev.flow.action.STOP_SSH_TUNNEL"
 
         fun start(context: android.content.Context) {
+            _status.value = TunnelStatus(TunnelPhase.CONNECTING)
             androidx.core.content.ContextCompat.startForegroundService(
                 context,
                 Intent(context, SshTunnelService::class.java),
@@ -292,3 +304,7 @@ class SshTunnelService : Service() {
         }
     }
 }
+
+data class TunnelStatus(val phase: TunnelPhase, val detail: String? = null)
+
+enum class TunnelPhase { STOPPED, CONNECTING, CONNECTED, RECONNECTING, ERROR }

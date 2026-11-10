@@ -224,8 +224,9 @@ internal fun NetworkSettingsScreen(
                                             val title = if (titleColumn >= 0) it.getString(titleColumn) else null
                                             val status = if (statusColumn >= 0) it.getInt(statusColumn) else -1
                                             if (title == fileName &&
-                                                status != DownloadManager.STATUS_FAILED &&
-                                                status != DownloadManager.STATUS_PAUSED
+                                                (status == DownloadManager.STATUS_PENDING ||
+                                                    status == DownloadManager.STATUS_RUNNING ||
+                                                    status == DownloadManager.STATUS_PAUSED)
                                             ) {
                                                 found = true
                                                 break

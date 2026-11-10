@@ -100,6 +100,14 @@ class NetworkSettingsViewModel
 
         fun edit(transform: (ProxyDraft) -> ProxyDraft) = _draft.update { it?.let(transform) }
 
+        fun importConfig(config: AppProxyConfig) {
+            val imported = ProxyDraft.of(config)
+            savedPort = config.port
+            _saved.value = imported
+            _draft.value = imported
+            write { preferences.setProxyConfig(config) }
+        }
+
         /** Saves the draft when it is valid; reports whether it was. */
         fun save(): Boolean {
             val current = _draft.value ?: return false

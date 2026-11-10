@@ -2,7 +2,10 @@ package io.github.aedev.flow.ui.screens.settings.network
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import android.app.DownloadManager
+import android.content.Context
 import android.net.Uri
+import android.os.Environment
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
@@ -194,6 +197,34 @@ internal fun NetworkSettingsScreen(
                             Text("Импорт настроек")
                         }
                         Text("Заменит текущие настройки прокси и SSH данными из файла.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+            row("network.backup.download") { shape ->
+                Surface(shape = shape, color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+                    androidx.compose.foundation.layout.Column(Modifier.fillMaxWidth().padding(12.dp)) {
+                        TextButton(
+                            modifier = Modifier.fillMaxWidth(),
+                            onClick = {
+                                runCatching {
+                                    val manager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+                                    val request = DownloadManager.Request(Uri.parse("https://github.com/definitly486/definitly486/releases/download/flow-network-settings/flow-network-settings.flowbackup"))
+                                        .setTitle("flow-network-settings.flowbackup")
+                                        .setDescription("Загрузка резервной копии настроек SSH и SOCKS5")
+                                        .setMimeType("application/octet-stream")
+                                        .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                                        .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "flow-network-settings.flowbackup")
+                                    manager.enqueue(request)
+                                }.onSuccess {
+                                    scope.launch { snackbarHostState.showSnackbar("Загрузка началась. Файл появится в папке Загрузки.") }
+                                }.onFailure {
+                                    scope.launch { snackbarHostState.showSnackbar("Не удалось начать загрузку: " + (it.message ?: "неизвестная ошибка")) }
+                                }
+                            },
+                        ) {
+                            Text("Скачать готовую резервную копию")
+                        }
+                        Text("Скачает flow-network-settings.flowbackup из GitHub Releases в папку Загрузки. Для импорта потребуется пароль файла.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }

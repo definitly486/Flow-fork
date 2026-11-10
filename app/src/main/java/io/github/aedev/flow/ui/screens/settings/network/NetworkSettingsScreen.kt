@@ -1,5 +1,8 @@
 package io.github.aedev.flow.ui.screens.settings.network
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.net.Uri
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
@@ -12,6 +15,7 @@ import androidx.compose.material.icons.outlined.Tag
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material.icons.outlined.VpnLock
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -28,6 +32,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
@@ -39,6 +44,8 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.aedev.flow.R
 import io.github.aedev.flow.network.AppProxyType
+import io.github.aedev.flow.data.local.NetworkSettingsBackup
+import io.github.aedev.flow.data.local.NetworkSettingsBackupCodec
 import io.github.aedev.flow.ui.components.settings.SettingEntry
 import io.github.aedev.flow.ui.components.settings.SettingsGroupScope
 import io.github.aedev.flow.ui.components.settings.SettingsPage
@@ -48,7 +55,9 @@ import io.github.aedev.flow.ui.components.settings.switch
 import io.github.aedev.flow.ui.components.settings.toggleGroup
 import io.github.aedev.flow.ui.components.shared.FlowToggleOption
 import io.github.aedev.flow.ui.screens.settings.index.NetworkIndex
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private val FieldPadding = 12.dp
 
@@ -66,6 +75,29 @@ internal fun NetworkSettingsScreen(
     val saved by viewModel.saved.collectAsStateWithLifecycle()
     val pausedByVpn by viewModel.pausedByVpn.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    var backupDialog by rememberSaveable { mutableStateOf<String?>(null) }
+    var backupPassword by rememberSaveable { mutableStateOf("") }
+    var pendingImportUri by remember { mutableStateOf<Uri?>(null) }
+    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
+        val password = backupPassword
+        if (uri != null && password.isNotEmpty()) scope.launch {
+            val result = runCatching {
+                withContext(Dispatchers.IO) {
+                    val currentProxy = viewModel.draft.value ?: error("Proxy settings unavailable")
+                    val currentSsh = sshViewModel.draft.value ?: error("SSH settings unavailable")
+                    context.contentResolver.openOutputStream(uri)?.use { output ->
+                        NetworkSettingsBackupCodec.write(output, NetworkSettingsBackup(currentProxy.toConfig(currentProxy.port.toIntOrNull() ?: 8080), currentSsh), password.toCharArray())
+                    } ?: error("Cannot open destination")
+                }
+            }
+            backupPassword = ""
+            snackbarHostState.showSnackbar(result.fold({ "Настройки экспортированы в зашифрованный файл" }, { "Ошибка экспорта: " + (it.message ?: "неизвестная ошибка") }))
+        }
+    }
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) { pendingImportUri = uri; backupPassword = ""; backupDialog = "import" }
+    }
     val snackbarHostState = remember { SnackbarHostState() }
     val savedMessage = stringResource(R.string.proxy_settings_saved)
     var passwordVisible by rememberSaveable { mutableStateOf(false) }
@@ -143,6 +175,73 @@ internal fun NetworkSettingsScreen(
             }
         }
         notice("network.restart", text = { stringResource(R.string.proxy_settings_restart_notice) })
+
+        group(key = "network.backup", header = R.string.settings_network_title) {
+            row("network.backup.export") { shape ->
+                Surface(shape = shape, color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+                    androidx.compose.foundation.layout.Column(Modifier.fillMaxWidth().padding(12.dp)) {
+                        TextButton(modifier = Modifier.fillMaxWidth(), onClick = { backupPassword = ""; backupDialog = "export" }) {
+                            Text("Экспорт настроек (зашифровать)")
+                        }
+                        Text("Сохранит SOCKS5 и SSH, включая пароли и known_hosts.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+            row("network.backup.import") { shape ->
+                Surface(shape = shape, color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+                    androidx.compose.foundation.layout.Column(Modifier.fillMaxWidth().padding(12.dp)) {
+                        TextButton(modifier = Modifier.fillMaxWidth(), onClick = { importLauncher.launch(arrayOf("application/octet-stream", "*/*")) }) {
+                            Text("Импорт настроек")
+                        }
+                        Text("Заменит текущие настройки прокси и SSH данными из файла.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        }
+        if (backupDialog != null) {
+            val exporting = backupDialog == "export"
+            AlertDialog(
+                onDismissRequest = { backupDialog = null; backupPassword = ""; pendingImportUri = null },
+                title = { Text(if (exporting) "Пароль для резервной копии" else "Расшифровка резервной копии") },
+                text = {
+                    androidx.compose.foundation.layout.Column {
+                        Text(if (exporting) "Задайте пароль от 8 символов. Он понадобится для импорта на другом устройстве." else "Введите пароль, которым был зашифрован файл.")
+                        OutlinedTextField(value = backupPassword, onValueChange = { backupPassword = it }, label = { Text("Пароль") }, singleLine = true, visualTransformation = PasswordVisualTransformation())
+                    }
+                },
+                confirmButton = {
+                    TextButton(enabled = backupPassword.length >= 8, onClick = {
+                        val password = backupPassword
+                        if (exporting) {
+                            backupDialog = null
+                            exportLauncher.launch("flow-network-settings.flowbackup")
+                        } else {
+                            val uri = pendingImportUri
+                            backupDialog = null
+                            if (uri != null) scope.launch {
+                                val result = runCatching {
+                                    withContext(Dispatchers.IO) {
+                                        context.contentResolver.openInputStream(uri)?.use { NetworkSettingsBackupCodec.read(it, password.toCharArray()) } ?: error("Cannot open file")
+                                    }
+                                }
+                                backupPassword = ""
+                                pendingImportUri = null
+                                result.onSuccess { backup ->
+                                    viewModel.importConfig(backup.proxy)
+                                    sshViewModel.importConfig(backup.ssh)
+                                    snackbarHostState.showSnackbar("Настройки SOCKS5 и SSH импортированы")
+                                }.onFailure {
+                                    snackbarHostState.showSnackbar("Ошибка импорта: " + (it.message ?: "неверный пароль или повреждённый файл"))
+                                }
+                            }
+                        }
+                    }) { Text(if (exporting) "Продолжить" else "Импортировать") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { backupDialog = null; backupPassword = ""; pendingImportUri = null }) { Text("Отмена") }
+                },
+            )
+        }
 
         val ssh = sshDraft
         val proxyReadyForTunnel = form.enabled && form.type == AppProxyType.SOCKS5 && form.valid && form == saved

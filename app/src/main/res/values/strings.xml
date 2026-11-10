@@ -4417,6 +4417,7 @@
     <string name="ssh_tunnel_status_connected_detail">SOCKS5 traffic is routed through the SSH server.</string>
     <string name="ssh_tunnel_status_reconnecting">Reconnecting</string>
     <string name="ssh_tunnel_status_reconnecting_detail">Connection lost. Automatic retry is in progress.</string>
+    <string name="ssh_tunnel_status_reconnecting_error_detail">Last error: %1$s. Retrying automatically.</string>
     <string name="ssh_tunnel_status_error">Connection error</string>
     <string name="ssh_tunnel_status_error_detail">%1$s. The app will retry automatically.</string>
     <string name="ssh_tunnel_start_connected">Tunnel is already running</string>

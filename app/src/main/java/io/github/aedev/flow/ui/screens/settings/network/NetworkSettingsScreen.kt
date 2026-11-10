@@ -2,6 +2,7 @@ package io.github.aedev.flow.ui.screens.settings.network
 
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Info
@@ -221,6 +222,19 @@ internal fun NetworkSettingsScreen(
                             enabled = ssh.valid && proxyReadyForTunnel,
                             onClick = { sshViewModel.start() },
                         ) { Text(stringResource(if (sshStatus.phase == io.github.aedev.flow.network.TunnelPhase.CONNECTED) R.string.ssh_tunnel_start_connected else R.string.ssh_tunnel_start)) }
+                        Text(
+                            stringResource(
+                                when {
+                                    !ssh.valid -> R.string.ssh_tunnel_start_requires_settings
+                                    !proxyReadyForTunnel -> R.string.ssh_tunnel_start_requires_proxy
+                                    sshStatus.phase == io.github.aedev.flow.network.TunnelPhase.CONNECTED -> R.string.ssh_tunnel_start_already_active
+                                    else -> R.string.ssh_tunnel_start_hint
+                                },
+                            ),
+                            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 }
                 row("network.ssh.stop") { shape ->
@@ -230,6 +244,12 @@ internal fun NetworkSettingsScreen(
                             enabled = sshStatus.phase != io.github.aedev.flow.network.TunnelPhase.STOPPED,
                             onClick = { sshViewModel.stop() },
                         ) { Text(stringResource(R.string.ssh_tunnel_stop)) }
+                        Text(
+                            stringResource(R.string.ssh_tunnel_stop_hint),
+                            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 }
             }

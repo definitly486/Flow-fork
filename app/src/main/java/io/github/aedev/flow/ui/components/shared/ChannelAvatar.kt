@@ -86,26 +86,26 @@ fun ChannelAvatarImage(
                     modifier = modifier,
                     contentScale = ContentScale.Crop,
                     onError = { errorResult ->
-                    val errMsg = errorResult.result.throwable?.message ?: "unknown error"
-                    if (!didRetry) {
-                        didRetry = true
-                        val src =
-                            currentModel as? String ?: run {
-                                Log.e(AVATAR_TAG, "Expected String model but got ${currentModel::class.simpleName}")
-                                return@AsyncImage
+                        val errMsg = errorResult.result.throwable?.message ?: "unknown error"
+                        if (!didRetry) {
+                            didRetry = true
+                            val src =
+                                currentModel as? String ?: run {
+                                    Log.e(AVATAR_TAG, "Expected String model but got ${currentModel::class.simpleName}")
+                                    return@AsyncImage
+                                }
+                            val lowRes = src.replace(Regex("=s\\d+"), "=s88")
+                            if (lowRes != src) {
+                                Log.w(AVATAR_TAG, "Failed '$src' ($errMsg) → retrying with '$lowRes'")
+                                currentModel = lowRes
+                            } else {
+                                Log.e(AVATAR_TAG, "Failed '$src' ($errMsg), no size param to replace → icon")
+                                currentModel = Icons.Default.AccountCircle
                             }
-                        val lowRes = src.replace(Regex("=s\\d+"), "=s88")
-                        if (lowRes != src) {
-                            Log.w(AVATAR_TAG, "Failed '$src' ($errMsg) → retrying with '$lowRes'")
-                            currentModel = lowRes
                         } else {
-                            Log.e(AVATAR_TAG, "Failed '$src' ($errMsg), no size param to replace → icon")
+                            Log.e(AVATAR_TAG, "Retry also failed for '$model' ($errMsg) → icon")
                             currentModel = Icons.Default.AccountCircle
                         }
-                    } else {
-                        Log.e(AVATAR_TAG, "Retry also failed for '$model' ($errMsg) → icon")
-                        currentModel = Icons.Default.AccountCircle
-                    }
                     },
                 )
             }

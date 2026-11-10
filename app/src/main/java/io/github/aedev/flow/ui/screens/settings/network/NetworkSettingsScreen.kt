@@ -207,16 +207,52 @@ internal fun NetworkSettingsScreen(
                             modifier = Modifier.fillMaxWidth(),
                             onClick = {
                                 runCatching {
+                                    val fileName = "flow-network-settings.flowbackup"
                                     val manager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-                                    val request = DownloadManager.Request(Uri.parse("https://github.com/definitly486/definitly486/releases/download/flow-network-settings/flow-network-settings.flowbackup"))
-                                        .setTitle("flow-network-settings.flowbackup")
-                                        .setDescription("Загрузка резервной копии настроек SSH и SOCKS5")
-                                        .setMimeType("application/octet-stream")
-                                        .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                                        .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "flow-network-settings.flowbackup")
-                                    manager.enqueue(request)
-                                }.onSuccess {
-                                    scope.launch { snackbarHostState.showSnackbar("Загрузка началась. Файл появится в папке Загрузки.") }
+
+                                    // Do not enqueue another download if this app already downloaded
+                                    // the file, or if the file is already present in public Downloads.
+                                    val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                                    val existingFile = java.io.File(downloadsDir, fileName)
+                                    val query = DownloadManager.Query()
+                                    val cursor = manager.query(query)
+                                    val alreadyQueuedOrDownloaded = cursor?.use {
+                                        val titleColumn = it.getColumnIndex(DownloadManager.COLUMN_TITLE)
+                                        val statusColumn = it.getColumnIndex(DownloadManager.COLUMN_STATUS)
+                                        var found = false
+                                        while (it.moveToNext()) {
+                                            val title = if (titleColumn >= 0) it.getString(titleColumn) else null
+                                            val status = if (statusColumn >= 0) it.getInt(statusColumn) else -1
+                                            if (title == fileName &&
+                                                status != DownloadManager.STATUS_FAILED &&
+                                                status != DownloadManager.STATUS_PAUSED
+                                            ) {
+                                                found = true
+                                                break
+                                            }
+                                        }
+                                        found
+                                    } ?: false
+
+                                    if (existingFile.exists() || alreadyQueuedOrDownloaded) {
+                                        false
+                                    } else {
+                                        val request = DownloadManager.Request(Uri.parse("https://github.com/definitly486/definitly486/releases/download/flow-network-settings/flow-network-settings.flowbackup"))
+                                            .setTitle(fileName)
+                                            .setDescription("Загрузка резервной копии настроек SSH и SOCKS5")
+                                            .setMimeType("application/octet-stream")
+                                            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                                            .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
+                                        manager.enqueue(request)
+                                        true
+                                    }
+                                }.onSuccess { started ->
+                                    scope.launch {
+                                        snackbarHostState.showSnackbar(
+                                            if (started) "Загрузка началась. Файл появится в папке Загрузки."
+                                            else "Файл уже существует или загружается. Повторная загрузка не требуется."
+                                        )
+                                    }
                                 }.onFailure {
                                     scope.launch { snackbarHostState.showSnackbar("Не удалось начать загрузку: " + (it.message ?: "неизвестная ошибка")) }
                                 }

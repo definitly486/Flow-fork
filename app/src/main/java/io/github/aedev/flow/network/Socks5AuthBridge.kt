@@ -96,13 +96,13 @@ internal class Socks5AuthBridge(
             clientOutput.flush()
 
             val connectRequest = readConnectRequest(clientInput)
-            upstream = Socket().also {
-                activeSockets.add(it)
-                it.connect(InetSocketAddress("127.0.0.1", upstreamPort), CONNECT_TIMEOUT_MS)
-                it.soTimeout = HANDSHAKE_TIMEOUT_MS
-            }
-            val upstreamInput = DataInputStream(upstream.getInputStream())
-            val upstreamOutput = upstream.getOutputStream()
+            val remote = Socket()
+            upstream = remote
+            activeSockets.add(remote)
+            remote.connect(InetSocketAddress("127.0.0.1", upstreamPort), CONNECT_TIMEOUT_MS)
+            remote.soTimeout = HANDSHAKE_TIMEOUT_MS
+            val upstreamInput = DataInputStream(remote.getInputStream())
+            val upstreamOutput = remote.getOutputStream()
 
             // Ask the remote SOCKS5 server specifically for username/password (RFC 1929).
             upstreamOutput.write(byteArrayOf(SOCKS_VERSION.toByte(), 1, USER_PASS.toByte()))
@@ -140,8 +140,8 @@ internal class Socks5AuthBridge(
             }
 
             client.soTimeout = 0
-            upstream.soTimeout = 0
-            relay(client, upstream)
+            remote.soTimeout = 0
+            relay(client, remote)
         } catch (error: Exception) {
             if (error !is SocketException || !client.isClosed) {
                 Log.w(TAG, "SOCKS5 bridge connection failed: ${error.message}")

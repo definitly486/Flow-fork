@@ -85,7 +85,7 @@ class SshTunnelService : Service() {
         }
     }
 
-    private fun establishTunnel() {
+    private suspend fun establishTunnel() {
         val ssh = SshTunnelConfigStore.load(this)
         require(ssh.valid) { getString(R.string.ssh_tunnel_invalid_settings) }
 

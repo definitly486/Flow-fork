@@ -60,8 +60,16 @@ object NetworkSettingsBackupCodec {
 
     fun read(input: InputStream, password: CharArray): NetworkSettingsBackup {
         require(password.size >= 8) { "Пароль должен содержать не менее 8 символов" }
-        val bytes = input.readBytes()
-        require(bytes.size in (MAGIC.size + SALT_SIZE + IV_SIZE + 16)..MAX_FILE_SIZE) { "Некорректный размер файла" }
+        val buffer = java.io.ByteArrayOutputStream()
+        val chunk = ByteArray(8192)
+        while (true) {
+            val count = input.read(chunk)
+            if (count < 0) break
+            require(buffer.size() + count <= MAX_FILE_SIZE) { "Файл резервной копии слишком большой" }
+            buffer.write(chunk, 0, count)
+        }
+        val bytes = buffer.toByteArray()
+        require(bytes.size >= MAGIC.size + SALT_SIZE + IV_SIZE + 16) { "Некорректный размер файла" }
         require(bytes.copyOfRange(0, MAGIC.size).contentEquals(MAGIC)) { "Это не файл резервной копии Flow" }
         var offset = MAGIC.size
         val salt = bytes.copyOfRange(offset, offset + SALT_SIZE).also { offset += SALT_SIZE }

@@ -87,7 +87,7 @@ internal class Socks5AuthBridge(
             if (methodCount == 0) throw IOException("Client offered no SOCKS authentication methods")
             val methods = ByteArray(methodCount)
             clientInput.readFully(methods)
-            if (NO_AUTH !in methods) {
+            if (NO_AUTH.toByte() !in methods) {
                 clientOutput.write(byteArrayOf(SOCKS_VERSION.toByte(), NO_ACCEPTABLE_METHOD.toByte()))
                 clientOutput.flush()
                 throw IOException("Local SOCKS client did not offer no-auth")

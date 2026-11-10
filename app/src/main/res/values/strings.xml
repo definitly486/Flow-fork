@@ -4420,4 +4420,9 @@
     <string name="ssh_tunnel_status_error">Connection error</string>
     <string name="ssh_tunnel_status_error_detail">%1$s. The app will retry automatically.</string>
     <string name="ssh_tunnel_start_connected">Tunnel is already running</string>
+    <string name="ssh_tunnel_start_requires_settings">Save complete SSH settings before starting.</string>
+    <string name="ssh_tunnel_start_requires_proxy">Enable and save a valid SOCKS5 proxy above first.</string>
+    <string name="ssh_tunnel_start_already_active">The SSH connection is active; no need to start it again.</string>
+    <string name="ssh_tunnel_start_hint">Starts the SSH connection and routes the saved SOCKS5 proxy through it.</string>
+    <string name="ssh_tunnel_stop_hint">Stops forwarding and returns traffic to the regular proxy settings.</string>
 </resources>

@@ -12,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -25,6 +26,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import io.github.aedev.flow.network.SshTunnelService
 import io.github.aedev.flow.utils.ThumbnailUrlResolver
 
 private const val AVATAR_TAG = "ChannelAvatarImage"
@@ -41,17 +43,23 @@ fun ChannelAvatarImage(
     contentDescription: String?,
     modifier: Modifier = Modifier,
 ) {
-    var currentModel by remember(url) {
+    // A request can fail while the SSH tunnel is connecting. The old fallback state survived
+    // that failure for as long as the URL stayed the same, so the avatar never tried again.
+    // Re-key the request on tunnel phase changes to retry when the route becomes available.
+    val tunnelStatus by SshTunnelService.status.collectAsState()
+    val tunnelPhase = tunnelStatus.phase
+
+    var currentModel by remember(url, tunnelPhase) {
         val highQualityUrl = ThumbnailUrlResolver.resolveChannelAvatar(url)
         val initial = highQualityUrl.takeIf { it.isNotEmpty() } ?: Icons.Default.AccountCircle
         if (initial is ImageVector) {
             Log.d(AVATAR_TAG, "null/empty url for '$contentDescription', using icon")
         } else {
-            Log.d(AVATAR_TAG, "init url='$highQualityUrl' for '$contentDescription'")
+            Log.d(AVATAR_TAG, "init url='$highQualityUrl' for '$contentDescription', tunnel=$tunnelPhase")
         }
         mutableStateOf<Any>(initial)
     }
-    var didRetry by remember(url) { mutableStateOf(false) }
+    var didRetry by remember(url, tunnelPhase) { mutableStateOf(false) }
 
     when (val model = currentModel) {
         is ImageVector -> {

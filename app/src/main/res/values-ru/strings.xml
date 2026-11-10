@@ -4540,6 +4540,7 @@
     <string name="ssh_tunnel_status_connected_detail">Трафик SOCKS5 передаётся через SSH-сервер.</string>
     <string name="ssh_tunnel_status_reconnecting">Повторное подключение</string>
     <string name="ssh_tunnel_status_reconnecting_detail">Соединение потеряно. Выполняется автоматическая попытка подключения.</string>
+    <string name="ssh_tunnel_status_reconnecting_error_detail">Последняя ошибка: %1$s. Повторное подключение выполняется автоматически.</string>
     <string name="ssh_tunnel_status_error">Ошибка подключения</string>
     <string name="ssh_tunnel_status_error_detail">%1$s. Приложение попробует подключиться снова.</string>
     <string name="ssh_tunnel_start_connected">Туннель уже запущен</string>

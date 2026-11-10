@@ -1,17 +1,7 @@
 name: Build armeabi-v7a APK
 
-# Builds the 32-bit ARM release APK and publishes it as flow-armeabi-v7a.apk
-# (Github flavor) or flow-foss-armeabi-v7a.apk (Foss flavor), the same names
-# the main release workflow uses.
-# Signed when the RELEASE_KEYSTORE_BASE64 secret exists, otherwise unsigned.
-#
-# Publishing to GitHub Releases happens only for a signed build, either when a
-# tag named release-* is pushed (the tag name becomes the release name) or when
-# the workflow is started manually with "publish" ticked and a tag filled in.
+# Manual build only. Publishing is available from workflow_dispatch.
 on:
-  push:
-    branches: [ main ]
-    tags: [ 'release-*' ]
   workflow_dispatch:
     inputs:
       flavor:
@@ -80,8 +70,6 @@ jobs:
             echo "::warning::RELEASE_KEYSTORE_BASE64 is not set. Building an UNSIGNED release APK."
           fi
 
-      # The ABI splits are configured in app/build.gradle.kts, so Gradle builds
-      # every ABI; only the armeabi-v7a file is picked out and published below.
       - name: Build release APK
         run: ./gradlew ":app:assemble${FLAVOR}Release" --stacktrace
         env:
@@ -112,7 +100,7 @@ jobs:
           retention-days: 30
 
       - name: Publish GitHub Release
-        if: ${{ startsWith(github.ref, 'refs/tags/release-') || (github.event_name == 'workflow_dispatch' && inputs.publish) }}
+        if: ${{ inputs.publish }}
         env:
           GH_TOKEN: ${{ github.token }}
           SIGNED: ${{ steps.keystore.outputs.signed }}
@@ -124,11 +112,7 @@ jobs:
             echo "::error::Refusing to publish an unsigned APK. Set RELEASE_KEYSTORE_BASE64, STORE_PASSWORD, KEY_ALIAS and KEY_PASSWORD."
             exit 1
           fi
-          if [ "${GITHUB_REF#refs/tags/}" != "$GITHUB_REF" ]; then
-            tag="${GITHUB_REF#refs/tags/}"
-          else
-            tag="$INPUT_TAG"
-          fi
+          tag="$INPUT_TAG"
           if [ -z "$tag" ]; then
             echo "::error::Fill in the 'tag' input to publish a release."
             exit 1

@@ -217,6 +217,7 @@ internal fun NetworkSettingsScreen(
                 }
                 row("network.ssh.start") { shape ->
                     Surface(shape = shape, color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+                        androidx.compose.foundation.layout.Column {
                         TextButton(
                             modifier = Modifier.fillMaxWidth(),
                             enabled = ssh.valid && proxyReadyForTunnel,
@@ -235,10 +236,12 @@ internal fun NetworkSettingsScreen(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                        }
                     }
                 }
                 row("network.ssh.stop") { shape ->
                     Surface(shape = shape, color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+                        androidx.compose.foundation.layout.Column {
                         TextButton(
                             modifier = Modifier.fillMaxWidth(),
                             enabled = sshStatus.phase != io.github.aedev.flow.network.TunnelPhase.STOPPED,
@@ -250,6 +253,7 @@ internal fun NetworkSettingsScreen(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                        }
                     }
                 }
             }

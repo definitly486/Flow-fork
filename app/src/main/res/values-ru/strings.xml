@@ -4531,4 +4531,16 @@
     <string name="ssh_tunnel_invalid_settings">Заполните все поля SSH и добавьте запись Known Hosts.</string>
     <string name="ssh_tunnel_requires_socks5">Перед запуском включите и настройте SOCKS5 в разделе «Сеть».</string>
     <string name="ssh_tunnel_saved">Настройки SSH сохранены</string>
+    <string name="ssh_tunnel_reconnecting">SSH отключён, повторное подключение…</string>
+    <string name="ssh_tunnel_status_stopped">Туннель остановлен</string>
+    <string name="ssh_tunnel_status_stopped_detail">Трафик идёт напрямую через настроенный прокси.</string>
+    <string name="ssh_tunnel_status_connecting">Подключение</string>
+    <string name="ssh_tunnel_status_connecting_detail">Устанавливается SSH-соединение и перенаправление SOCKS5.</string>
+    <string name="ssh_tunnel_status_connected">Туннель работает</string>
+    <string name="ssh_tunnel_status_connected_detail">Трафик SOCKS5 передаётся через SSH-сервер.</string>
+    <string name="ssh_tunnel_status_reconnecting">Повторное подключение</string>
+    <string name="ssh_tunnel_status_reconnecting_detail">Соединение потеряно. Выполняется автоматическая попытка подключения.</string>
+    <string name="ssh_tunnel_status_error">Ошибка подключения</string>
+    <string name="ssh_tunnel_status_error_detail">%1$s. Приложение попробует подключиться снова.</string>
+    <string name="ssh_tunnel_start_connected">Туннель уже запущен</string>
 </resources>

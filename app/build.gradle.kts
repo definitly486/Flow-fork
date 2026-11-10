@@ -326,6 +326,8 @@ dependencies {
     // Networking
     implementation(libs.okhttp)
     implementation("com.github.mwiede:jsch:0.2.25")
+    // Ed25519 provider for SSH host-key verification on Android versions without JCA support.
+    implementation("org.bouncycastle:bcprov-jdk18on:1.86")
 
     // Ktor (Managed in libs.versions.toml)
     implementation(libs.ktor.client.core)

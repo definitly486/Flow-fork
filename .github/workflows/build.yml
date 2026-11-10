@@ -1,12 +1,6 @@
 name: Android CI/CD
 
 on:
-  push:
-    branches: [ main ]
-    tags:
-      - 'v*'
-  pull_request:
-    branches: [ main ]
   workflow_dispatch:
 
 # Collapse superseded runs on branches and PRs. Tag runs publish the release

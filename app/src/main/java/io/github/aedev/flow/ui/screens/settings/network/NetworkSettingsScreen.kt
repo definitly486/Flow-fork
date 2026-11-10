@@ -198,50 +198,6 @@ internal fun NetworkSettingsScreen(
                 }
             }
         }
-        if (backupDialog != null) {
-            val exporting = backupDialog == "export"
-            AlertDialog(
-                onDismissRequest = { backupDialog = null; backupPassword = ""; pendingImportUri = null },
-                title = { Text(if (exporting) "Пароль для резервной копии" else "Расшифровка резервной копии") },
-                text = {
-                    androidx.compose.foundation.layout.Column {
-                        Text(if (exporting) "Задайте пароль от 8 символов. Он понадобится для импорта на другом устройстве." else "Введите пароль, которым был зашифрован файл.")
-                        OutlinedTextField(value = backupPassword, onValueChange = { backupPassword = it }, label = { Text("Пароль") }, singleLine = true, visualTransformation = PasswordVisualTransformation())
-                    }
-                },
-                confirmButton = {
-                    TextButton(enabled = backupPassword.length >= 8, onClick = {
-                        val password = backupPassword
-                        if (exporting) {
-                            backupDialog = null
-                            exportLauncher.launch("flow-network-settings.flowbackup")
-                        } else {
-                            val uri = pendingImportUri
-                            backupDialog = null
-                            if (uri != null) scope.launch {
-                                val result = runCatching {
-                                    withContext(Dispatchers.IO) {
-                                        context.contentResolver.openInputStream(uri)?.use { NetworkSettingsBackupCodec.read(it, password.toCharArray()) } ?: error("Cannot open file")
-                                    }
-                                }
-                                backupPassword = ""
-                                pendingImportUri = null
-                                result.onSuccess { backup ->
-                                    viewModel.importConfig(backup.proxy)
-                                    sshViewModel.importConfig(backup.ssh)
-                                    snackbarHostState.showSnackbar("Настройки SOCKS5 и SSH импортированы")
-                                }.onFailure {
-                                    snackbarHostState.showSnackbar("Ошибка импорта: " + (it.message ?: "неверный пароль или повреждённый файл"))
-                                }
-                            }
-                        }
-                    }) { Text(if (exporting) "Продолжить" else "Импортировать") }
-                },
-                dismissButton = {
-                    TextButton(onClick = { backupDialog = null; backupPassword = ""; pendingImportUri = null }) { Text("Отмена") }
-                },
-            )
-        }
 
         val ssh = sshDraft
         val proxyReadyForTunnel = form.enabled && form.type == AppProxyType.SOCKS5 && form.valid && form == saved
@@ -360,6 +316,51 @@ internal fun NetworkSettingsScreen(
             }
         }
     }
+
+            if (backupDialog != null) {
+                val exporting = backupDialog == "export"
+                AlertDialog(
+                    onDismissRequest = { backupDialog = null; backupPassword = ""; pendingImportUri = null },
+                    title = { Text(if (exporting) "Пароль для резервной копии" else "Расшифровка резервной копии") },
+                    text = {
+                        androidx.compose.foundation.layout.Column {
+                            Text(if (exporting) "Задайте пароль от 8 символов. Он понадобится для импорта на другом устройстве." else "Введите пароль, которым был зашифрован файл.")
+                            OutlinedTextField(value = backupPassword, onValueChange = { backupPassword = it }, label = { Text("Пароль") }, singleLine = true, visualTransformation = PasswordVisualTransformation())
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(enabled = backupPassword.length >= 8, onClick = {
+                            val password = backupPassword
+                            if (exporting) {
+                                backupDialog = null
+                                exportLauncher.launch("flow-network-settings.flowbackup")
+                            } else {
+                                val uri = pendingImportUri
+                                backupDialog = null
+                                if (uri != null) scope.launch {
+                                    val result = runCatching {
+                                        withContext(Dispatchers.IO) {
+                                            context.contentResolver.openInputStream(uri)?.use { NetworkSettingsBackupCodec.read(it, password.toCharArray()) } ?: error("Cannot open file")
+                                        }
+                                    }
+                                    backupPassword = ""
+                                    pendingImportUri = null
+                                    result.onSuccess { backup ->
+                                        viewModel.importConfig(backup.proxy)
+                                        sshViewModel.importConfig(backup.ssh)
+                                        snackbarHostState.showSnackbar("Настройки SOCKS5 и SSH импортированы")
+                                    }.onFailure {
+                                        snackbarHostState.showSnackbar("Ошибка импорта: " + (it.message ?: "неверный пароль или повреждённый файл"))
+                                    }
+                                }
+                            }
+                        }) { Text(if (exporting) "Продолжить" else "Импортировать") }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { backupDialog = null; backupPassword = ""; pendingImportUri = null }) { Text("Отмена") }
+                    },
+                )
+            }
 }
 
 private class FieldOptions {

@@ -4543,4 +4543,9 @@
     <string name="ssh_tunnel_status_error">Ошибка подключения</string>
     <string name="ssh_tunnel_status_error_detail">%1$s. Приложение попробует подключиться снова.</string>
     <string name="ssh_tunnel_start_connected">Туннель уже запущен</string>
+    <string name="ssh_tunnel_start_requires_settings">Перед запуском сохраните заполненные настройки SSH.</string>
+    <string name="ssh_tunnel_start_requires_proxy">Сначала включите и сохраните корректные настройки SOCKS5 выше.</string>
+    <string name="ssh_tunnel_start_already_active">SSH-соединение активно, повторный запуск не требуется.</string>
+    <string name="ssh_tunnel_start_hint">Подключает SSH и направляет через него сохранённый SOCKS5-прокси.</string>
+    <string name="ssh_tunnel_stop_hint">Останавливает перенаправление и возвращает обычные настройки прокси.</string>
 </resources>

@@ -34,8 +34,9 @@ import java.security.Signature
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 
 /**
- * SSH local-forward service, ported from Telegram-X's proven SshTunnelService:
- * 127.0.0.1:1080 -> SSH -> the SOCKS5 listener on the SSH server.
+ * SSH local-forward service:
+ * app -> 127.0.0.1:1080 (no-auth bridge) -> 127.0.0.1:1081 -> SSH
+ * -> the authenticated SOCKS5 listener on the SSH server.
  *
  * Flow's saved SOCKS5 endpoint remains the source of port and credentials; SSH settings
  * are stored separately and never overwrite the saved proxy.
@@ -45,6 +46,7 @@ class SshTunnelService : Service() {
     @Volatile private var running = false
     @Volatile private var session: Session? = null
     @Volatile private var tunnelProxy: AppProxyConfig? = null
+    @Volatile private var authBridge: Socks5AuthBridge? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -123,22 +125,37 @@ class SshTunnelService : Service() {
         try {
             connected.connect(15_000)
             check(running) { "SSH tunnel start was cancelled" }
-            // SOCKS5 and SSH are on the same remote machine: target its loopback listener.
-            connected.setPortForwardingL(LOCAL_HOST, LOCAL_PORT, "127.0.0.1", proxy.port)
+            // Forward a private second port to the remote SOCKS5 server. The local
+            // bridge on LOCAL_PORT performs RFC 1929 authentication explicitly.
+            connected.setPortForwardingL(LOCAL_HOST, FORWARD_PORT, "127.0.0.1", proxy.port)
             check(running) { "SSH tunnel start was cancelled" }
 
+            val bridge = Socks5AuthBridge(
+                listenPort = LOCAL_PORT,
+                upstreamPort = FORWARD_PORT,
+                username = proxy.username,
+                password = proxy.password,
+            )
+            bridge.start()
+            authBridge = bridge
+            check(running) { "SSH tunnel start was cancelled" }
+
+            // The app connects to the loopback bridge without credentials; the bridge
+            // authenticates to the remote SOCKS5 endpoint using the saved credentials.
             val localProxy = proxy.copy(
                 host = LOCAL_HOST,
                 port = LOCAL_PORT,
                 type = AppProxyType.SOCKS5,
+                username = "",
+                password = "",
                 enabled = true,
             )
             tunnelProxy = localProxy
             AppProxyManager.setTunnelProxy(localProxy)
             io.github.aedev.flow.innertube.YouTube.proxy = AppProxyManager.currentProxy()
-            // SOCKS5 authentication remains in AppProxyManager's configured credentials.
+            // No proxy credentials are sent by app clients to the local bridge.
             io.github.aedev.flow.innertube.YouTube.proxyAuth = null
-            Log.i(TAG, "SSH tunnel established: 127.0.0.1:$LOCAL_PORT -> SSH -> 127.0.0.1:${proxy.port}")
+            Log.i(TAG, "SSH tunnel established: 127.0.0.1:$LOCAL_PORT -> auth bridge -> 127.0.0.1:$FORWARD_PORT -> SSH -> 127.0.0.1:${proxy.port}")
         } catch (error: Exception) {
             connected.disconnect()
             session = null
@@ -187,6 +204,8 @@ class SshTunnelService : Service() {
     }
 
     private fun disconnect() {
+        authBridge?.let { runCatching { it.close() } }
+        authBridge = null
         val active = session
         session = null
         if (active != null) runCatching { active.disconnect() }
@@ -257,6 +276,7 @@ class SshTunnelService : Service() {
         private const val NOTIFICATION_ID = 7412
         private const val LOCAL_HOST = "127.0.0.1"
         private const val LOCAL_PORT = 1080
+        private const val FORWARD_PORT = 1081
         private const val RECONNECT_DELAY_MS = 5_000L
         private const val ACTION_STOP = "io.github.aedev.flow.action.STOP_SSH_TUNNEL"
 

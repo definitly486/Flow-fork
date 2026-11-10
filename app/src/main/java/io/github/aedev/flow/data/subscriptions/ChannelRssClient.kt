@@ -55,26 +55,30 @@ class ChannelRssClient internal constructor(
             val request = Request.Builder().url(String.format(RSS_URL_FORMAT, channelId)).build()
             httpClient().newCall(request).execute().use { response ->
                 val code = response.code
-                when {
-                    code == HTTP_TOO_MANY_REQUESTS || code >= HTTP_SERVER_ERROR -> {
-                        Attempt(
-                            result = Result.failure(IOException("HTTP $code for channel $channelId")),
-                            retryAfterMs = retryDelayMs(response.header("Retry-After")),
-                        )
+                if (!response.isSuccessful) {
+                    // A 404 can come from YouTube or an intermediary; status alone cannot tell us which.
+                    val bodyPreview = response.body.string()
+                        .replace(Regex("\\s+"), " ")
+                        .take(MAX_ERROR_BODY_CHARS)
+                    val diagnostic = buildString {
+                        append("HTTP $code for channel $channelId at ${response.request.url}")
+                        response.header("Server")?.let { append(", server=$it") }
+                        response.header("Content-Type")?.let { append(", contentType=$it") }
+                        if (bodyPreview.isNotBlank()) append(", body=$bodyPreview")
                     }
+                    val failure = Result.failure<ChannelRssFeed>(IOException(diagnostic))
+                    return@use when {
+                        code == HTTP_TOO_MANY_REQUESTS || code >= HTTP_SERVER_ERROR ->
+                            Attempt(failure, retryDelayMs(response.header("Retry-After")))
+                        else -> Attempt(failure)
+                    }
+                }
 
-                    !response.isSuccessful -> {
-                        Attempt(Result.failure(IOException("HTTP $code for channel $channelId")))
-                    }
-
-                    else -> {
-                        val body = response.body.string()
-                        if (body.isEmpty()) {
-                            Attempt(Result.failure(IOException("Empty RSS body for channel $channelId")))
-                        } else {
-                            Attempt(runCatching { ChannelRssParser.parse(body) })
-                        }
-                    }
+                val body = response.body.string()
+                if (body.isEmpty()) {
+                    Attempt(Result.failure(IOException("Empty RSS body for channel $channelId")))
+                } else {
+                    Attempt(runCatching { ChannelRssParser.parse(body) })
                 }
             }
         } catch (e: IOException) {
@@ -98,5 +102,6 @@ class ChannelRssClient internal constructor(
         const val HTTP_SERVER_ERROR = 500
         const val DEFAULT_RETRY_DELAY_MS = 1_500L
         const val MAX_RETRY_DELAY_MS = 10_000L
+        const val MAX_ERROR_BODY_CHARS = 240
     }
 }

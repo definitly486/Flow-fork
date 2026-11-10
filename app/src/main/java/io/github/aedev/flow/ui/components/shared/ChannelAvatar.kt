@@ -14,6 +14,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -76,12 +77,15 @@ fun ChannelAvatarImage(
         }
 
         else -> {
-            AsyncImage(
-                model = model,
-                contentDescription = contentDescription,
-                modifier = modifier,
-                contentScale = ContentScale.Crop,
-                onError = { errorResult ->
+            // Recreate Coil's request node as well as the fallback state. Reusing the same URL
+            // alone can leave the previous failed request attached after the tunnel reconnects.
+            key(tunnelPhase) {
+                AsyncImage(
+                    model = model,
+                    contentDescription = contentDescription,
+                    modifier = modifier,
+                    contentScale = ContentScale.Crop,
+                    onError = { errorResult ->
                     val errMsg = errorResult.result.throwable?.message ?: "unknown error"
                     if (!didRetry) {
                         didRetry = true
@@ -102,8 +106,9 @@ fun ChannelAvatarImage(
                         Log.e(AVATAR_TAG, "Retry also failed for '$model' ($errMsg) → icon")
                         currentModel = Icons.Default.AccountCircle
                     }
-                },
-            )
+                    },
+                )
+            }
         }
     }
 }

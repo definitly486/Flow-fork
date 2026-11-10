@@ -5,12 +5,6 @@ import org.junit.Test
 import java.net.InetSocketAddress
 import java.net.Proxy
 
-/**
- * A resolved proxy address costs a DNS lookup wherever the `Proxy` is built, and clients are built
- * from lazy fields that Hilt can touch on the main thread — that combination crashed the Library and
- * Music tabs with `NetworkOnMainThreadException` (issue #888). These tests pin the endpoint down as
- * unresolved so the lookup stays on the connection thread.
- */
 class AppProxyConfigTest {
     private fun config(
         type: AppProxyType = AppProxyType.HTTP,
@@ -21,7 +15,6 @@ class AppProxyConfigTest {
     @Test
     fun `http proxy endpoint is left unresolved so no lookup happens on the calling thread`() {
         val proxy = config().toProxy()
-
         assertThat(proxy).isNotNull()
         assertThat(proxy!!.type()).isEqualTo(Proxy.Type.HTTP)
         val address = proxy.address() as InetSocketAddress
@@ -33,12 +26,30 @@ class AppProxyConfigTest {
     @Test
     fun `socks5 proxy endpoint is left unresolved too`() {
         val proxy = config(type = AppProxyType.SOCKS5, port = 1080).toProxy()
-
         assertThat(proxy).isNotNull()
         assertThat(proxy!!.type()).isEqualTo(Proxy.Type.SOCKS)
         val address = proxy.address() as InetSocketAddress
         assertThat(address.isUnresolved).isTrue()
         assertThat(address.port).isEqualTo(1080)
+    }
+
+    @Test
+    fun `SOCKS credentials match equivalent loopback host names`() {
+        assertThat(matchesProxyAuthEndpoint("127.0.0.1", 1080, "localhost", 1080)).isTrue()
+        assertThat(matchesProxyAuthEndpoint("localhost", 1080, "::1", 1080)).isTrue()
+        assertThat(matchesProxyAuthEndpoint("127.0.0.1", 1080, "127.0.0.2", 1080)).isTrue()
+    }
+
+    @Test
+    fun `SOCKS credentials do not match a different endpoint`() {
+        assertThat(matchesProxyAuthEndpoint("127.0.0.1", 1080, "192.168.1.2", 1080)).isFalse()
+        assertThat(matchesProxyAuthEndpoint("127.0.0.1", 1080, "localhost", 1081)).isFalse()
+        assertThat(matchesProxyAuthEndpoint("proxy.example.test", 1080, "localhost", 1080)).isFalse()
+    }
+
+    @Test
+    fun `an unspecified requesting port is accepted when host matches`() {
+        assertThat(matchesProxyAuthEndpoint("127.0.0.1", 1080, "localhost", -1)).isTrue()
     }
 
     @Test
@@ -52,7 +63,6 @@ class AppProxyConfigTest {
     @Test
     fun `a vpn pauses the proxy only when the bypass is on`() {
         val bypass = config().copy(bypassOnVpn = true)
-
         assertThat(bypass.effective(vpnActive = true).toProxy()).isNull()
         assertThat(bypass.effective(vpnActive = false).toProxy()).isNotNull()
         assertThat(config().effective(vpnActive = true).toProxy()).isNotNull()

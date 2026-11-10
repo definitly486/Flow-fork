@@ -86,7 +86,7 @@ class SshTunnelService : Service() {
                 clearTunnelProxy()
             }
             if (running) {
-                _status.value = TunnelStatus(TunnelPhase.RECONNECTING)
+                _status.value = TunnelStatus(TunnelPhase.RECONNECTING, _status.value.detail)
                 updateNotification(getString(R.string.ssh_tunnel_reconnecting))
                 delay(RECONNECT_DELAY_MS)
             }

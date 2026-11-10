@@ -62,6 +62,7 @@ internal fun NetworkSettingsScreen(
 ) {
     val draft by viewModel.draft.collectAsStateWithLifecycle()
     val sshDraft by sshViewModel.draft.collectAsStateWithLifecycle()
+    val sshStatus by sshViewModel.status.collectAsStateWithLifecycle()
     val saved by viewModel.saved.collectAsStateWithLifecycle()
     val pausedByVpn by viewModel.pausedByVpn.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
@@ -148,6 +149,42 @@ internal fun NetworkSettingsScreen(
         if (ssh != null) {
             notice("network.ssh.about", text = { stringResource(R.string.ssh_tunnel_description) }, icon = Icons.Outlined.Info)
             group(key = "network.ssh", header = R.string.ssh_tunnel_title) {
+                row("network.ssh.status") { shape ->
+                    val (statusText, statusColor, statusDetail) = when (sshStatus.phase) {
+                        io.github.aedev.flow.network.TunnelPhase.STOPPED -> Triple(R.string.ssh_tunnel_status_stopped, MaterialTheme.colorScheme.onSurfaceVariant, R.string.ssh_tunnel_status_stopped_detail)
+                        io.github.aedev.flow.network.TunnelPhase.CONNECTING -> Triple(R.string.ssh_tunnel_status_connecting, MaterialTheme.colorScheme.tertiary, R.string.ssh_tunnel_status_connecting_detail)
+                        io.github.aedev.flow.network.TunnelPhase.CONNECTED -> Triple(R.string.ssh_tunnel_status_connected, MaterialTheme.colorScheme.primary, R.string.ssh_tunnel_status_connected_detail)
+                        io.github.aedev.flow.network.TunnelPhase.RECONNECTING -> Triple(R.string.ssh_tunnel_status_reconnecting, MaterialTheme.colorScheme.tertiary, R.string.ssh_tunnel_status_reconnecting_detail)
+                        io.github.aedev.flow.network.TunnelPhase.ERROR -> Triple(R.string.ssh_tunnel_status_error, MaterialTheme.colorScheme.error, R.string.ssh_tunnel_status_error_detail)
+                    }
+                    Surface(shape = shape, color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+                        androidx.compose.foundation.layout.Row(
+                            modifier = Modifier.fillMaxWidth().padding(16.dp),
+                            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                imageVector = when (sshStatus.phase) {
+                                    io.github.aedev.flow.network.TunnelPhase.CONNECTED -> androidx.compose.material.icons.Icons.Outlined.CheckCircle
+                                    io.github.aedev.flow.network.TunnelPhase.ERROR -> androidx.compose.material.icons.Icons.Outlined.ErrorOutline
+                                    io.github.aedev.flow.network.TunnelPhase.STOPPED -> androidx.compose.material.icons.Icons.Outlined.CloudOff
+                                    else -> androidx.compose.material.icons.Icons.Outlined.Sync
+                                },
+                                contentDescription = null,
+                                tint = statusColor,
+                            )
+                            androidx.compose.foundation.layout.Column(Modifier.padding(start = 12.dp).weight(1f)) {
+                                Text(stringResource(statusText), color = statusColor, style = MaterialTheme.typography.titleSmall)
+                                Text(
+                                    if (sshStatus.phase == io.github.aedev.flow.network.TunnelPhase.ERROR) {
+                                        stringResource(R.string.ssh_tunnel_status_error_detail, sshStatus.detail ?: stringResource(R.string.unknown_error))
+                                    } else stringResource(statusDetail),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                }
                 field(NetworkIndex.sshHost, ssh.host, { value -> sshViewModel.edit { it.copy(host = value) } }, Icons.Outlined.Public)
                 field(NetworkIndex.sshPort, ssh.port.toString(), { value -> sshViewModel.edit { it.copy(port = value.filter(Char::isDigit).toIntOrNull() ?: 0) } }, Icons.Outlined.Tag) {
                     keyboardType = KeyboardType.Number
@@ -183,13 +220,14 @@ internal fun NetworkSettingsScreen(
                             modifier = Modifier.fillMaxWidth(),
                             enabled = ssh.valid && proxyReadyForTunnel,
                             onClick = { sshViewModel.start() },
-                        ) { Text(stringResource(R.string.ssh_tunnel_start)) }
+                        ) { Text(stringResource(if (sshStatus.phase == io.github.aedev.flow.network.TunnelPhase.CONNECTED) R.string.ssh_tunnel_start_connected else R.string.ssh_tunnel_start)) }
                     }
                 }
                 row("network.ssh.stop") { shape ->
                     Surface(shape = shape, color = MaterialTheme.colorScheme.surfaceContainerHigh) {
                         TextButton(
                             modifier = Modifier.fillMaxWidth(),
+                            enabled = sshStatus.phase != io.github.aedev.flow.network.TunnelPhase.STOPPED,
                             onClick = { sshViewModel.stop() },
                         ) { Text(stringResource(R.string.ssh_tunnel_stop)) }
                     }

@@ -2,7 +2,6 @@ package io.github.aedev.flow.ui.screens.settings.network
 
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Info
@@ -163,12 +162,13 @@ internal fun NetworkSettingsScreen(
                             modifier = Modifier.fillMaxWidth().padding(16.dp),
                             verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
                         ) {
-                            Icon(
+                            val tunnelDetail = sshStatus.detail
+                    Icon(
                                 imageVector = when (sshStatus.phase) {
-                                    io.github.aedev.flow.network.TunnelPhase.CONNECTED -> androidx.compose.material.icons.Icons.Outlined.CheckCircle
-                                    io.github.aedev.flow.network.TunnelPhase.ERROR -> androidx.compose.material.icons.Icons.Outlined.ErrorOutline
-                                    io.github.aedev.flow.network.TunnelPhase.STOPPED -> androidx.compose.material.icons.Icons.Outlined.CloudOff
-                                    else -> androidx.compose.material.icons.Icons.Outlined.Sync
+                                    io.github.aedev.flow.network.TunnelPhase.CONNECTED -> Icons.Outlined.VpnLock
+                                    io.github.aedev.flow.network.TunnelPhase.ERROR -> Icons.Outlined.Info
+                                    io.github.aedev.flow.network.TunnelPhase.STOPPED -> Icons.Outlined.Public
+                                    else -> Icons.Outlined.Info
                                 },
                                 contentDescription = null,
                                 tint = statusColor,
@@ -177,8 +177,8 @@ internal fun NetworkSettingsScreen(
                                 Text(stringResource(statusText), color = statusColor, style = MaterialTheme.typography.titleSmall)
                                 Text(
                                     when {
-                                        sshStatus.phase == io.github.aedev.flow.network.TunnelPhase.ERROR -> stringResource(R.string.ssh_tunnel_status_error_detail, sshStatus.detail ?: stringResource(R.string.unknown_error))
-                                        sshStatus.phase == io.github.aedev.flow.network.TunnelPhase.RECONNECTING && sshStatus.detail != null -> stringResource(R.string.ssh_tunnel_status_reconnecting_error_detail, sshStatus.detail)
+                                        sshStatus.phase == io.github.aedev.flow.network.TunnelPhase.ERROR -> stringResource(R.string.ssh_tunnel_status_error_detail, tunnelDetail ?: stringResource(R.string.unknown_error))
+                                        sshStatus.phase == io.github.aedev.flow.network.TunnelPhase.RECONNECTING && tunnelDetail != null -> stringResource(R.string.ssh_tunnel_status_reconnecting_error_detail, tunnelDetail)
                                         else -> stringResource(statusDetail)
                                     },
                                     style = MaterialTheme.typography.bodySmall,
